@@ -1,0 +1,43 @@
+# Compiled output
+dist/
+*.js
+*.js.map
+*.d.ts
+*.d.ts.map
+
+# Except config files
+!vitest.config.ts
+!eslint.config.js
+# Dependencies
+node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# GCP Related Files
+gcp/
+
+# GCP Service Account Keys
+*-key.json
+*.json.key
+service-account*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test Logs
+test/_logs

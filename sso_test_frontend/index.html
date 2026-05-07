@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Steam SSO Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px 0;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 20px;
+      padding: 10px;
+      background: #f3f3f3;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Steam SSO Test</h1>
+
+  <button id="pingBtn">Ping Backend</button>
+  <button id="loginBtn">Login with Steam</button>
+  <button id="meBtn">Check Session</button>
+  <button id="logoutBtn">Logout</button>
+
+  <div id="status">Not checked yet.</div>
+
+  <script>
+    const BACKEND = "http://localhost:8080";
+
+    // Backend Ping button
+    document.getElementById("pingBtn").onclick = () => {
+      // Redirect browser to backend Steam login route
+      window.location.href = BACKEND + "/ping";
+    };
+
+    // 1️⃣ Login button
+    document.getElementById("loginBtn").onclick = async () => {
+        // Redirect browser to backend Steam login route
+        window.location.href = "http://localhost:8080/auth/login/steam";
+    };
+
+    // 2️⃣ Check session button
+    document.getElementById("meBtn").onclick = async () => {
+      try {
+        const res = await fetch(BACKEND + "/auth/me", {
+          credentials: "include" // IMPORTANT for cross-site cookies
+        });
+
+        const data = await res.json();
+
+        document.getElementById("status").innerText =
+          JSON.stringify(data, null, 2);
+      } catch (err) {
+        document.getElementById("status").innerText =
+          "Error checking session.";
+      }
+    };
+
+    // 3️⃣ Logout button
+    document.getElementById("logoutBtn").onclick = async () => {
+      await fetch(BACKEND + "/auth/logout", {
+        method: "POST",
+        credentials: "include"
+      });
+
+      document.getElementById("status").innerText = "Logged out.";
+    };
+  </script>
+
+</body>
+</html>

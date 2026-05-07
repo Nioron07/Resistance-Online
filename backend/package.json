@@ -1,0 +1,53 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rimraf dist",
+    "build": "npm run clean && tsc -p tsconfig.json",
+    "start:proxy": "gcp\\cloud-sql-proxy.x64.exe --credentials-file=gcp/keys/resistance-dashboard-key.json orbu-test-2:us-central1:free-trial-first-project",
+    "start:server": "node dist/index.js",
+    "start": "concurrently --kill-others \"npm run start:proxy\" \"npm run start:server\"",
+    "dev": "npm run build && npm start",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@dataqoi/fastify-router": "^0.2.2",
+    "@fastify/autoload": "^6.3.1",
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^11.2.0",
+    "@fastify/passport": "^3.0.2",
+    "@fastify/session": "^11.1.1",
+    "@fastify/swagger": "^9.7.0",
+    "@fastify/swagger-ui": "^5.2.5",
+    "@fastify/websocket": "^11.2.0",
+    "@fastify/static": "^9.1.1",
+    "dotenv": "^17.3.1",
+    "fastify": "^5.7.4",
+    "passport-steam": "^1.0.18",
+    "pg": "^8.18.0",
+    "pg-format": "^1.0.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/node": "^25.2.3",
+    "@types/passport-steam": "^1.0.6",
+    "@types/pg": "^8.16.0",
+    "@types/pg-format": "^1.0.5",
+    "@types/ws": "^8.18.1",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.39.2",
+    "rimraf": "^6.1.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.55.0",
+    "vitest": "^4.0.18"
+  }
+}
