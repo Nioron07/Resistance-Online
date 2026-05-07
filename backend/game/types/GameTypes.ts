@@ -156,4 +156,12 @@ export interface GameState {
     resistanceWins: number;
     winner: 'resistance' | 'spies' | null;
     assassinationTarget: PlayerId | null;
+
+    // Partial-progress sets so a reconnecting client can render the active
+    // phase without missing the per-submission events that fired before
+    // they joined. We expose IDs only, never the values, so we don't leak
+    // pre-result information.
+    votedPlayerIds: PlayerId[];
+    submittedSuspicionPlayerIds: PlayerId[];
+    playedMissionCardPlayerIds: PlayerId[];
 }

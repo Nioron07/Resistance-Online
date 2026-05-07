@@ -95,7 +95,7 @@ export abstract class DAC {
                 return DAC.run(async () => {
                     return (await db.transaction<QueryResult<{ id: number }>>((client: PoolClient): Promise<QueryResult<{ id: number }>> => {
                         return client.query(DAC.queries.resistance.games.create);
-                    })).rows[0]?.id!;
+                    })).rows[0]!.id;
                 });
             },
             
@@ -137,7 +137,7 @@ export abstract class DAC {
                              */
                             async add(): Promise<'exists' | 'added' | null> {
                                 return DAC.run(async () => {
-                                    return (await db.transaction(async (client: PoolClient): Promise<QueryResult<any>> => {
+                                    return (await db.transaction(async (client: PoolClient): Promise<QueryResult<QueryResultRow>> => {
                                         /**
                                          * @note Watch the types on `userid`. The change depending on the query.
                                          *      `as` syntax is not a mistake. It is being used as a flag to explicitly show future readers what type it needs to be for a given query.
@@ -147,13 +147,13 @@ export abstract class DAC {
 
                                         const exists: boolean = (await client.query<{ exists: boolean }>(
                                             DAC.queries.resistance.games.id.playerId.exists, [gameid, userid.toString() as string]
-                                        )).rows[0]?.exists!;
-    
+                                        )).rows[0]!.exists;
+
                                         // If the user exists, silently fail
                                         if (exists) {
-                                            return undefined as unknown as QueryResult<any>; // Typescript typing is a truly mysterious thing
+                                            return undefined as unknown as QueryResult<QueryResultRow>; // Typescript typing is a truly mysterious thing
                                         }
-    
+
                                         client.query(DAC.queries.resistance.games.id.playerId.update_last_played, [userid as number]);
                                         return client.query(DAC.queries.resistance.games.id.playerId.add_update, [gameid, { [userid]: null }]);
                                     })) === undefined ? 'exists' : 'added';
@@ -177,7 +177,7 @@ export abstract class DAC {
                              */
                             async update(role: RoleName): Promise<'updated' | null> {
                                 return DAC.run<Promise<'updated'>>(async () => {
-                                    await db.transaction((client: PoolClient): Promise<QueryResult<any>> => {
+                                    await db.transaction((client: PoolClient): Promise<QueryResult<QueryResultRow>> => {
                                         return client.query(DAC.queries.resistance.games.id.playerId.add_update, [gameid, {[userid]: role}]);
                                     });
 
@@ -200,7 +200,7 @@ export abstract class DAC {
                              */
                             async remove(): Promise<'removed' | null> {
                                 return DAC.run<Promise<'removed'>>(async () => {
-                                    await db.transaction((client: PoolClient): Promise<QueryResult<any>> => {
+                                    await db.transaction((client: PoolClient): Promise<QueryResult<QueryResultRow>> => {
                                         return client.query(DAC.queries.resistance.games.id.playerId.remove, [gameid, userid.toString() as string]);
                                     });
     
@@ -228,7 +228,7 @@ export abstract class DAC {
                      */
                     async updateSettings(config: object): Promise<'updated' | 'no game' | null> {
                         return DAC.run<Promise<'updated' | 'no game'>>(async () => {
-                            const result = await db.transaction((client: PoolClient): Promise<QueryResult<any>> => {
+                            const result = await db.transaction((client: PoolClient): Promise<QueryResult<QueryResultRow>> => {
                                 return client.query(DAC.queries.resistance.games.id.updateSettings, [gameid, structuredClone(config)]);
                             });
     
@@ -240,7 +240,7 @@ export abstract class DAC {
                         return DAC.run<Promise<'started'>>(async () => {
                             await db.transaction(async (client: PoolClient) => {
                                 client.query(DAC.queries.resistance.games.id.start, [gameid]);
-                                return undefined as unknown as QueryResult<any>;
+                                return undefined as unknown as QueryResult<QueryResultRow>;
                             });
                             return 'started';
                         });
@@ -264,58 +264,57 @@ export abstract class DAC {
                      */
                     async end(state: ResistanceState, reason: string): Promise<'ended' | null> {
                         return DAC.run<Promise<'ended'>>(async () => {
-                            await db.transaction(async (client: PoolClient): Promise<QueryResult<any>> => {
+                            // Snapshot synchronously, before any await, so the
+                                // values we persist can't drift if ResistanceCore
+                                // mutates state while the transaction runs.
                                 const _state: ResistanceState = structuredClone(state);
-                                const date: string = new Date().toISOString()
-                                // Update Game Row
-                                // No need to await here. There are no data dependencies this and the player profile calls.
-                                client.query(DAC.queries.resistance.games.id.end.gameRow, [
-                                    gameid,
-                                    _state.count_rounds - _state.missions.length,                   // games.count_failed_votes
-                                    _state.missions.map((e: MissionResult) => e.success),       // games.mission_statuses
-                                    // structuredClone strips class getters, so _state.winner is undefined.
-                                    // endWinner is a plain field so it survives the clone.
-                                    _state.endWinner === "resistance",                              // games.resistance_win
-                                    reason,                                                         // games.outcome_type
-                                    date                                                            // games.end_timestamp
-                                ]);
-    
-                                // For each player, update player stats.
-                                /**
-                                 * @note This logic can be optimized for performance, by unrolling the loop directly into the SQL Logic.
-                                 *      However, I deemed this an unneeded optimization for the current version of the DAC.
-                                 *      That being said, if I feel like it, I may do this in the future.
-                                 *      I still am taking advantage of the fact that none of these calls affect eachother, meaning I can fire off the async call and not have to await.
-                                 * - Joseph Habisohn 4/19/2026
-                                 */
+                                const winningTeam: 'spy' | 'resistance' | null =
+                                    _state.endWinner === 'spies' ? 'spy'
+                                    : _state.endWinner === 'resistance' ? 'resistance'
+                                    : null;
+                                // structuredClone drops the Map prototype, but
+                                // (depending on the runtime) the entries survive
+                                // as a plain object or get rebuilt as a Map. Read
+                                // roles via the original state — it's safe because
+                                // we haven't yielded yet.
+                                const playerRoles = new Map<number, RoleName | undefined>();
                                 for (const playerId of _state.seatOrder) {
-                                    // endWinner is 'spies' | 'resistance'; teamOf returns 'spy' | 'resistance'.
-                                    // Map the plural form down to the singular team name before comparing.
-                                    const winningTeam: 'spy' | 'resistance' | null =
-                                        state.endWinner === 'spies' ? 'spy'
-                                        : state.endWinner === 'resistance' ? 'resistance'
-                                        : null;
-                                    const player_won = winningTeam !== null
-                                        && winningTeam === teamOf(state.players.get(playerId)?.role!);
-    
-                                    /**
-                                     * @note The fourth parameter of this sql call is not currently implemented as it requires the statistics to be implemented.
-                                     *      I lowkey do not want to do that right now so its being left blank.
-                                     *      Once statistics are implemented, I will come back here, update the sql query, and compute the statistics.
-                                     * - Joseph Habisohn 4/19/2026
-                                    */
-                                    // No need to await here. There are no data dependencies between iterations.
-                                    client.query(DAC.queries.resistance.games.id.end.playerProfile, [
-                                        playerId,
-                                        date,                                                       // player_profiles.last_online
-                                        player_won ? 1 : 0,                                         // player_profiles.count_games_won
-                                        { [gameid]: player_won },                                     // player_profiles.game_metrics
-                                        // {}                                                       // player_profiles.overall_metrics
-                                    ]);
+                                    playerRoles.set(playerId, state.players.get(playerId)?.role);
                                 }
-    
-                                return undefined as unknown as QueryResult<any>;        // I love ts (thats double entendre, im so good at this game)
-                            });
+
+                                await db.transaction(async (client: PoolClient): Promise<QueryResult<QueryResultRow>> => {
+                                    const date: string = new Date().toISOString()
+                                    const queries: Promise<QueryResult<QueryResultRow>>[] = [];
+
+                                    queries.push(client.query(DAC.queries.resistance.games.id.end.gameRow, [
+                                        gameid,
+                                        _state.count_rounds - _state.missions.length,
+                                        _state.missions.map((e: MissionResult) => e.success),
+                                        _state.endWinner === "resistance",
+                                        reason,
+                                        date
+                                    ]));
+
+                                    for (const playerId of _state.seatOrder) {
+                                        const role = playerRoles.get(playerId);
+                                        const player_won = winningTeam !== null
+                                            && role !== undefined
+                                            && winningTeam === teamOf(role);
+
+                                        queries.push(client.query(DAC.queries.resistance.games.id.end.playerProfile, [
+                                            playerId,
+                                            date,
+                                            player_won ? 1 : 0,
+                                            { [gameid]: player_won },
+                                        ]));
+                                    }
+
+                                    // Wait for everything inside the transaction so
+                                    // failures actually surface (and roll back)
+                                    // instead of being silently dropped.
+                                    await Promise.all(queries);
+                                    return undefined as unknown as QueryResult<QueryResultRow>;
+                                });
                             
                             return 'ended';
                         });
@@ -374,7 +373,7 @@ export abstract class DAC {
                             state_copy.pendingSuspicions                                                // voting_rounds.suspicions
                         ]);
     
-                    })).rows[0]?.id!;
+                    })).rows[0]!.id;
                 });
             },
             
@@ -387,7 +386,7 @@ export abstract class DAC {
              * @param roundid `number` The ID of the round to manage.
              * @returns An object providing APIs for managing round data and voting information.
              */
-            id(roundid: number) {
+            id(_roundid: number) {
                 return {
     
                 }
@@ -441,7 +440,7 @@ export abstract class DAC {
                     pfp,
                     connection
                 ]);
-            })).rows[0]?.id!; // Creation will always have a id because public.player_profiles.id is a BigSerial
+            })).rows[0]!.id; // Creation will always have a id because public.player_profiles.id is a BigSerial
         },
 
         id(userid: number) {

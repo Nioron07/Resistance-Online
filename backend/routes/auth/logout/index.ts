@@ -23,7 +23,7 @@ const POST: RouteHandler = async (req: FastifyRequest, rep: FastifyReply) => {
 }
 
 // ------------------- ------------------- Inject the Methods into the Route ------------------- ------------------- \\
-async function routes(fastify: FastifyInstance, _: Object) {
+async function routes(fastify: FastifyInstance, _: object) {
   fastify.post('', POST);
 }
 

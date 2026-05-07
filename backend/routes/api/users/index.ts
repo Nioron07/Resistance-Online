@@ -94,7 +94,7 @@ export const get_opts = {
         }
     }
 };
-async function routes(fastify: FastifyInstance, _: Object) {
+async function routes(fastify: FastifyInstance, _: object) {
   fastify.get('', get_opts, GET);
 }
 

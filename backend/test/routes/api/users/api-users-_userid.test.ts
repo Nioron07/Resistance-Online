@@ -182,6 +182,43 @@ describe('api/users/:userid Route', () => {
         }
     });
 
+    describe('verbosity validation', () => {
+        it('should 400 when verbosity is a non-numeric string', async () => {
+            const response = await server.inject({
+                method: 'GET',
+                url: '/api/users/4?verbosity=abc',
+            });
+            expect(response.statusCode).toBe(400);
+        });
+
+        it('should 400 when verbosity is out of range', async () => {
+            const response = await server.inject({
+                method: 'GET',
+                url: '/api/users/4?verbosity=5',
+            });
+            expect(response.statusCode).toBe(400);
+        });
+
+        it('should 400 when verbosity is negative', async () => {
+            const response = await server.inject({
+                method: 'GET',
+                url: '/api/users/4?verbosity=-1',
+            });
+            expect(response.statusCode).toBe(400);
+        });
+
+        it('should accept verbosity=1 without 400ing (regression: refresh-logout bug)', async () => {
+            vi.mocked(db.queryOne).mockResolvedValueOnce(mocked_user_profiles.one);
+
+            const response = await server.inject({
+                method: 'GET',
+                url: '/api/users/4?verbosity=1',
+            });
+            // Anything but 400 is fine for this regression check.
+            expect(response.statusCode).not.toBe(400);
+        });
+    });
+
     it('should return 200 and all information when the userid exists and verbosity is set to 2', async () => {
         vi.mocked(db.queryOne).mockResolvedValueOnce(mocked_user_profiles.two);
         const response = await server.inject({

@@ -31,7 +31,7 @@ const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: FastifyRepl
 
 }
 
-async function routes(fastify: FastifyInstance, _: Object) {
+async function routes(fastify: FastifyInstance, _: object) {
     fastify.get("", {
         schema: {
             querystring: {

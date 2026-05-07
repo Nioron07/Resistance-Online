@@ -1,15 +1,19 @@
-import { ResistanceGameRoom } from '../game/ResistanceGameRoom.js';
 import { GameRoom } from './GameRoom.js';
+
+// Grace window after a game ends before its room is deleted, so players
+// can briefly reconnect and see the end screen.
+const POST_GAME_GRACE_MS = 5 * 60 * 1000;
 
 class RoomManager {
     private rooms = new Map<number, GameRoom>;
+    private cleanupTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
     /**
      * Creates a new game with a unique 6-digit join code.
      *
      * @returns The GameRoom instance.
      */
-    async createRoom<T extends GameRoom = GameRoom>(RoomFactory: (code: number, ...args: any[]) => Promise<T>): Promise<T | null> {
+    async createRoom<T extends GameRoom = GameRoom>(RoomFactory: (code: number, ...args: unknown[]) => Promise<T>): Promise<T | null> {
         let code: number | undefined = undefined;
         do {
             code = Math.floor(Math.random() * 1000000);
@@ -66,7 +70,31 @@ class RoomManager {
     }
 
     removeRoom(code: number): boolean {
+        const timer = this.cleanupTimers.get(code);
+        if (timer) {
+            clearTimeout(timer);
+            this.cleanupTimers.delete(code);
+        }
         return this.rooms.delete(code);
+    }
+
+    /**
+     * Schedule deletion of a room after the post-game grace window. Idempotent:
+     * a second call with the same code is a no-op while the timer is pending.
+     */
+    scheduleRemoval(code: number, delayMs: number = POST_GAME_GRACE_MS): void {
+        if (this.cleanupTimers.has(code)) return;
+        if (!this.rooms.has(code)) return;
+
+        const timer = setTimeout(() => {
+            this.cleanupTimers.delete(code);
+            this.rooms.delete(code);
+        }, delayMs);
+        // Don't keep the event loop alive just for cleanup.
+        if (typeof timer === 'object' && timer && 'unref' in timer) {
+            (timer as { unref?: () => void }).unref?.();
+        }
+        this.cleanupTimers.set(code, timer);
     }
 }
 

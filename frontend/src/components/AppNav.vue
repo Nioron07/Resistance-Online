@@ -19,7 +19,7 @@
 
     <v-list density="compact" nav>
       <v-list-item prepend-icon="mdi-home" title="Home" value="home" @click="router.push('/')" />
-<!--      <v-list-item prepend-icon="mdi-trophy" title="Leaderboard" value="leaderboard" @click="router.push('/Leaderboard')" /> -->
+      <!--      <v-list-item prepend-icon="mdi-trophy" title="Leaderboard" value="leaderboard" @click="router.push('/Leaderboard')" /> -->
 
       <template v-if="appStore.isAuthenticated">
         <v-list-item prepend-icon="mdi-chart-bar" title="My Stats" value="stats" @click="router.push(`/Profile/${appStore.user?.username}`)" />

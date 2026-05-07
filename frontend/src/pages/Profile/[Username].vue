@@ -41,38 +41,42 @@
 
                   <div class="stat-section-body">
                     <div class="stat-row">
-                      <v-tooltip text="Cmon" location="end">
+                      <v-tooltip location="end" text="Cmon">
                         <template #activator="{ props }">
                           <span class="stat-label" style="cursor: default" v-bind="props">Games Played</span>
                         </template>
                       </v-tooltip>
+
                       <span class="stat-value"> {{ metrics?.counts.games ?? '-' }} </span>
                     </div>
 
                     <div class="stat-row">
-                      <v-tooltip text="how many times you locked in" location="end">
+                      <v-tooltip location="end" text="how many times you locked in">
                         <template #activator="{ props }">
                           <span class="stat-label" style="cursor: default" v-bind="props">Wins</span>
                         </template>
                       </v-tooltip>
+
                       <span class="stat-value">{{ metrics?.counts.wins ?? '-' }}</span>
                     </div>
 
                     <div class="stat-row">
-                      <v-tooltip text="how many times you locked out" location="end">
+                      <v-tooltip location="end" text="how many times you locked out">
                         <template #activator="{ props }">
                           <span class="stat-label" style="cursor: default" v-bind="props">Losses</span>
                         </template>
                       </v-tooltip>
+
                       <span class="stat-value">{{ metrics?.counts.losses ?? '-' }}</span>
                     </div>
 
                     <div class="stat-row">
-                      <v-tooltip text="u threw" location="end">
+                      <v-tooltip location="end" text="u threw">
                         <template #activator="{ props }">
                           <span class="stat-label" style="cursor: default" v-bind="props">Throws</span>
                         </template>
                       </v-tooltip>
+
                       <span class="stat-value">—</span>
                     </div>
                   </div>
@@ -84,38 +88,42 @@
 
                   <div class="stat-section-body">
                     <div class="stat-row">
-                      <v-tooltip text="Lifetime Rate of CD: Fraction of Spies this player has put onto their proposed teams as a Resistance Leader" location="end">
+                      <v-tooltip location="end" text="Lifetime Rate of CD: Fraction of Spies this player has put onto their proposed teams as a Resistance Leader">
                         <template #activator="{ props }">
                           <span class="stat-label" style="cursor: default" v-bind="props">ROCD</span>
                         </template>
                       </v-tooltip>
+
                       <span class="stat-value">{{ pct(metrics?.resistance.RoCD_L) }}</span>
                     </div>
 
                     <div class="stat-row">
-                      <v-tooltip text="Games as Resistance" location="end">
+                      <v-tooltip location="end" text="Games as Resistance">
                         <template #activator="{ props }">
                           <span class="stat-label" style="cursor: default" v-bind="props">Games Played</span>
                         </template>
                       </v-tooltip>
+
                       <span class="stat-value">{{ metrics?.counts.gamesAsResistance ?? '-' }}</span>
                     </div>
 
                     <div class="stat-row">
-                      <v-tooltip text="Resistance for the win" location="end">
+                      <v-tooltip location="end" text="Resistance for the win">
                         <template #activator="{ props }">
                           <span class="stat-label" style="cursor: default" v-bind="props">Games Won</span>
                         </template>
                       </v-tooltip>
+
                       <span class="stat-value">—</span>
                     </div>
 
                     <div class="stat-row">
-                      <v-tooltip text="Lifetime Rate of Sherlock: Measures how good this player is at sussing out spies over thier lifetime" location="end">
+                      <v-tooltip location="end" text="Lifetime Rate of Sherlock: Measures how good this player is at sussing out spies over thier lifetime">
                         <template #activator="{ props }">
                           <span class="stat-label" style="cursor: default" v-bind="props">ROS</span>
                         </template>
                       </v-tooltip>
+
                       <span class="stat-value">{{ pct(metrics?.resistance.RoS_L) }}</span>
                     </div>
                   </div>
@@ -127,38 +135,42 @@
 
                   <div class="stat-section-body">
                     <div class="stat-row">
-                      <v-tooltip text="Rate of Illusion: How well a Spy flies under the radar" location="end">
+                      <v-tooltip location="end" text="Rate of Illusion: How well a Spy flies under the radar">
                         <template #activator="{ props }">
                           <span class="stat-label" style="cursor: default" v-bind="props">ROI</span>
                         </template>
                       </v-tooltip>
+
                       <span class="stat-value">{{ pct(metrics?.spy.RoI_L) }}</span>
                     </div>
 
                     <div class="stat-row">
-                      <v-tooltip text="Games as Spy" location="end">
+                      <v-tooltip location="end" text="Games as Spy">
                         <template #activator="{ props }">
                           <span class="stat-label" style="cursor: default" v-bind="props">Games Played</span>
                         </template>
                       </v-tooltip>
+
                       <span class="stat-value">{{ metrics?.counts.gamesAsSpy ?? '-' }}</span>
                     </div>
 
                     <div class="stat-row">
-                      <v-tooltip text="Spy win" location="end">
+                      <v-tooltip location="end" text="Spy win">
                         <template #activator="{ props }">
                           <span class="stat-label" style="cursor: default" v-bind="props">Games Won</span>
                         </template>
                       </v-tooltip>
+
                       <span class="stat-value">—</span>
                     </div>
 
                     <div class="stat-row">
-                      <v-tooltip text="Rate of Infiltration: Proportion of times that you were proposed on a team as a spy, that lead to you going on that mission" location="end">
+                      <v-tooltip location="end" text="Rate of Infiltration: Proportion of times that you were proposed on a team as a spy, that lead to you going on that mission">
                         <template #activator="{ props }">
                           <span class="stat-label" style="cursor: default" v-bind="props">ROIF</span>
                         </template>
                       </v-tooltip>
+
                       <span class="stat-value">{{ pct(metrics?.spy.RoIF_L) }}</span>
                     </div>
                   </div>
@@ -173,10 +185,10 @@
 </template>
 
 <script setup lang="ts">
+  import { computed, onMounted, ref } from 'vue'
   import AppNav from '@/components/AppNav.vue'
   import StatsRadarChart from '@/components/StatsRadarChart.vue'
   import { useAppStore } from '@/stores/app'
-  import { ref, onMounted, computed } from 'vue'
 
   const route = useRoute('/Profile/[Username]')
   const appStore = useAppStore()
@@ -215,7 +227,7 @@
       Consistency: c?.games != null && c?.wins != null && c.games > 0
         ? Math.round((c.wins / c.games) * 100)
         : 0,
-      Trust: 0
+      Trust: 0,
     }
   })
 </script>

@@ -1,8 +1,6 @@
-import websocket, { WebSocket, WebsocketHandler } from '@fastify/websocket';
+import { WebSocket } from '@fastify/websocket';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { roomManager } from "../../../../managers/RoomManager.js";
-import { handleGameMessage } from "../../../../handlers/gameHandler.js";
-// import { Network } from "node:inspector";
 import { GameRoom } from '../../../../managers/GameRoom.js';
 import { TestGameRoom } from '../../../../managers/TestGameRoom.js';
 
@@ -96,7 +94,7 @@ const GET = async (socket: WebSocket, req: FastifyRequest<Post>) => {
 };
 
 // ------------------- ------------------- Inject the Methods into the Route ------------------- ------------------- \\
-async function routes(fastify: FastifyInstance, _: Object) {
+async function routes(fastify: FastifyInstance, _: object) {
   fastify.get('', {
         websocket: true,
         schema: {

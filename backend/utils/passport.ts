@@ -11,12 +11,12 @@ declare module 'fastify' {
 export const passport = new Authenticator();
 
 // Only Store the username as the identifier in the session
-passport.registerUserSerializer(async (user: any, req) => {
+passport.registerUserSerializer(async (user: unknown, _req) => {
   return user; // @TODO: Test if this works. This assumes that user.id is what we want as our database uses username as the primary key.
 });
 
 // Grab the user information from the db
-passport.registerUserDeserializer(async (user: string, req) => {
+passport.registerUserDeserializer(async (user: string, _req) => {
   // const user_info = {
   //   username: username,
   // }; // @TODO: Actually replace with the sql call

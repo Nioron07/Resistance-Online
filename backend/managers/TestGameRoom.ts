@@ -52,14 +52,14 @@ export class TestGameRoom extends GameRoom {
     }
 
     // ------------------ ------------------ Messaging ------------------ ------------------ \\
-    broadcast(data: any): void {
-        let json = JSON.stringify(data);
-        
+    broadcast(data: unknown): void {
+        const json = JSON.stringify(data);
+
         for (const conn of this.players.values()) {
             conn.send(json);
         }
     }
-    
+
     broadcastState(): void {
         this.broadcast({
             type: "game_state",
@@ -71,7 +71,7 @@ export class TestGameRoom extends GameRoom {
     /**
      * Wraps the GameState's Transition Function
      */
-    delta(input: any, action?: ['left' | 'right', 'left' | 'right'] | 'transfer' | 'divide'): void {
+    delta(input: string, action?: ['left' | 'right', 'left' | 'right'] | 'transfer' | 'divide'): void {
         const winner: string | undefined = this.state.delta(input, action);
         if (winner === undefined) {
             this.broadcast({

@@ -4,6 +4,7 @@ import { roomManager } from "../../../../managers/RoomManager.js";
 import { GameRoom } from "../../../../managers/GameRoom.js";
 import { ResistanceGameRoom } from "../../../../game/ResistanceGameRoom.js";
 import { ClientEvents } from "../../../../game/types/Events.js";
+import { validateClientEvent } from "../../../../game/validateClientEvent.js";
 import { clearInterval } from "node:timers";
 
 /**
@@ -46,8 +47,14 @@ const GET = async (socket: WebSocket, req: FastifyRequest<Post>) => {
     return;
   }
 
-  // by this point we know that user is valid because of auth prevalidation
-  const userid = req.user!.userid;
+  // isAuthenticated() can be true while deserializeUser is still resolving
+  // / has failed. Guard explicitly so we never call addPlayer(undefined).
+  const userid = req.user?.userid;
+  if (userid === undefined || userid === null) {
+    socket.send("Error (401): Session is missing or invalid");
+    socket.close(401);
+    return;
+  }
 
   // Add the player to the Game
   const added: boolean = room.addPlayer(userid, socket);
@@ -94,10 +101,14 @@ const GET = async (socket: WebSocket, req: FastifyRequest<Post>) => {
         return;
       }
 
-      /**
-       * @note `as ClientEvents[typeof event]` is a bit of a hack and expects the correct structure of the data from the frontend
-       * We can look into validation with zod or something later
-       */
+      const validation = validateClientEvent(event, data);
+      if (!validation.ok) {
+        room.send(socket, "socket:error", {
+          message: `Invalid '${event}' message: ${validation.reason}`,
+        });
+        return;
+      }
+
       room.bus.emit(
         event as keyof ClientEvents,
         {

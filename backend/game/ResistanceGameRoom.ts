@@ -168,11 +168,16 @@ export class ResistanceGameRoom extends GameRoom{
      * @param data Corresponding data for the event
      */
     send<K extends keyof ServerEvents>(ws: WebSocket, event: K, data: ServerEvents[K]) {
-        ws.send(JSON.stringify({event, data}));
+        try {
+            ws.send(JSON.stringify({event, data}));
+        } catch (err) {
+            console.warn(`[WS] send failed for event ${String(event)}`, err);
+        }
     }
 
     /**
-     * Broadcasts the selected ServerEvent to every client
+     * Broadcasts the selected ServerEvent to every client.
+     * A failing socket is logged and skipped; it must not abort the loop.
      *
      * @param event The ServerEvent
      * @param data Corresponding data for the event
@@ -180,8 +185,12 @@ export class ResistanceGameRoom extends GameRoom{
     broadcast<K extends keyof ServerEvents>(event: K, data: ServerEvents[K]) {
         const msg = JSON.stringify({event, data});
 
-        for (const ws of this.players.values()) {
-            ws.send(msg);
+        for (const [playerId, ws] of this.players.entries()) {
+            try {
+                ws.send(msg);
+            } catch (err) {
+                console.warn(`[WS] broadcast send failed for player ${playerId}`, err);
+            }
         }
     }
 
@@ -190,7 +199,11 @@ export class ResistanceGameRoom extends GameRoom{
      */
     broadcastState() {
         for (const [playerId, ws] of this.players.entries()) {
-            ws.send(JSON.stringify({event: "state:update", data: {state: this.state.serializeFor(playerId)}}));
+            try {
+                ws.send(JSON.stringify({event: "state:update", data: {state: this.state.serializeFor(playerId)}}));
+            } catch (err) {
+                console.warn(`[WS] state:update send failed for player ${playerId}`, err);
+            }
         }
     }
 }

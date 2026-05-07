@@ -37,7 +37,7 @@ function getMessages(ws: WebSocket) {
     return (ws.send as any).mock.calls.map((c: any) => JSON.parse(c[0]));
 }
 
-function getLastMessage(ws: WebSocket) {
+function _getLastMessage(ws: WebSocket) {
     return getMessages(ws).at(-1);
 }
 
@@ -1044,6 +1044,154 @@ describe('ResistanceCore', () => {
             expect(room.state.missions[0]!.nominations.length).toBe(2);
             expect(room.state.missions[0]!.nominations[0]!.outcome).toBe(false);
             expect(room.state.missions[0]!.nominations[1]!.outcome).toBe(true);
+        });
+    });
+
+    // ROLES_5_PLAYER puts spies at seats 4 and 5.
+    describe('spy suspicions are dropped server-side', () => {
+        beforeEach(() => {
+            startGame(room, ROLES_5_PLAYER);
+            // Drive the game into a suspicion phase (round 0 reject is skipped,
+            // round 1 reject enters suspicion).
+            room.bus.emit('nomination:submit', { senderId: room.state.leaderId, team: [1, 2] });
+            allReject(room);
+            room.bus.emit('nomination:submit', { senderId: room.state.leaderId, team: [1, 2] });
+            allReject(room);
+            expect(room.state.phase).toBe('suspicion');
+        });
+
+        it('does not record a spy submission in pendingSuspicions', () => {
+            room.bus.emit('sus:submit', { senderId: 4, sus: { 1: 9 } });
+            expect(4 in room.state.pendingSuspicions).toBe(false);
+        });
+
+        it('does not broadcast suspicion:received for a spy submission', () => {
+            vi.clearAllMocks();
+            room.bus.emit('sus:submit', { senderId: 4, sus: { 1: 9 } });
+            for (const ws of sockets) {
+                expect(getMessageOfType(ws, 'suspicion:received')).toBeUndefined();
+            }
+        });
+
+        it('still advances to nomination once all resistance players submit', () => {
+            // Players 1, 2, 3 are resistance.
+            room.bus.emit('sus:submit', { senderId: 1, sus: {} });
+            room.bus.emit('sus:submit', { senderId: 2, sus: {} });
+            room.bus.emit('sus:submit', { senderId: 3, sus: {} });
+            expect(room.state.phase).toBe('nomination');
+        });
+
+        it('persisted suspicions contain only resistance entries', () => {
+            // Spy tries to influence — should be ignored entirely.
+            room.bus.emit('sus:submit', { senderId: 4, sus: { 1: 10 } });
+            room.bus.emit('sus:submit', { senderId: 5, sus: { 2: 10 } });
+            // Resistance submits truthfully.
+            room.bus.emit('sus:submit', { senderId: 1, sus: { 4: 8 } });
+            room.bus.emit('sus:submit', { senderId: 2, sus: { 4: 7 } });
+            room.bus.emit('sus:submit', { senderId: 3, sus: { 5: 9 } });
+
+            const lastNom = room.state.pendingNominations[room.state.pendingNominations.length - 1]!;
+            expect(lastNom.suspicions).toBeDefined();
+            const recorded = Object.keys(lastNom.suspicions!).map(Number).sort();
+            expect(recorded).toEqual([1, 2, 3]);
+        });
+    });
+
+    describe('partial-progress broadcasts', () => {
+        beforeEach(() => {
+            startGame(room, ROLES_5_PLAYER);
+        });
+
+        it('broadcasts vote:received on each individual vote', () => {
+            room.bus.emit('nomination:submit', { senderId: room.state.leaderId, team: [1, 2] });
+            vi.clearAllMocks();
+
+            room.bus.emit('vote:cast', { senderId: 1, vote: true });
+            for (const ws of sockets) {
+                const msg = getMessageOfType(ws, 'vote:received');
+                expect(msg).toBeDefined();
+                expect(msg.data.playerId).toBe(1);
+            }
+        });
+
+        it('broadcasts mission:card-played on each individual card', () => {
+            room.bus.emit('nomination:submit', { senderId: room.state.leaderId, team: [1, 2] });
+            allApprove(room);
+            vi.clearAllMocks();
+
+            room.bus.emit('mission:play-card', { senderId: 1, card: true });
+            for (const ws of sockets) {
+                const msg = getMessageOfType(ws, 'mission:card-played');
+                expect(msg).toBeDefined();
+                expect(msg.data.playerId).toBe(1);
+            }
+        });
+
+        it('broadcasts suspicion:received only for resistance submissions', () => {
+            room.bus.emit('nomination:submit', { senderId: room.state.leaderId, team: [1, 2] });
+            allReject(room);
+            room.bus.emit('nomination:submit', { senderId: room.state.leaderId, team: [1, 2] });
+            allReject(room);
+            expect(room.state.phase).toBe('suspicion');
+            vi.clearAllMocks();
+
+            // Resistance — should broadcast.
+            room.bus.emit('sus:submit', { senderId: 1, sus: {} });
+            for (const ws of sockets) {
+                expect(getMessageOfType(ws, 'suspicion:received')).toBeDefined();
+            }
+
+            vi.clearAllMocks();
+            // Spy — must NOT broadcast.
+            room.bus.emit('sus:submit', { senderId: 4, sus: {} });
+            for (const ws of sockets) {
+                expect(getMessageOfType(ws, 'suspicion:received')).toBeUndefined();
+            }
+        });
+    });
+
+    describe('error notifications on bad submissions', () => {
+        beforeEach(() => {
+            startGame(room, ROLES_5_PLAYER);
+        });
+
+        it('sends socket:error to a non-leader who tries to nominate', () => {
+            const nonLeader = [...room.state.players.keys()].find(id => id !== room.state.leaderId)!;
+            const senderSocket = sockets[nonLeader - 1]!;
+            (senderSocket.send as any).mockClear();
+
+            room.bus.emit('nomination:submit', { senderId: nonLeader, team: [1, 2] });
+
+            const err = getMessageOfType(senderSocket, 'socket:error');
+            expect(err).toBeDefined();
+            expect(err.data.message).toMatch(/leader/i);
+        });
+
+        it('sends socket:error to the leader for a wrong-size team', () => {
+            const leader = room.state.leaderId;
+            const senderSocket = sockets[leader - 1]!;
+            (senderSocket.send as any).mockClear();
+
+            // Mission 0 for 5 players wants size 2; send 3 to fail.
+            room.bus.emit('nomination:submit', { senderId: leader, team: [1, 2, 3] });
+
+            const err = getMessageOfType(senderSocket, 'socket:error');
+            expect(err).toBeDefined();
+            expect(err.data.message).toMatch(/team/i);
+        });
+
+        it('sends socket:error when a non-team member tries to play a mission card', () => {
+            room.bus.emit('nomination:submit', { senderId: room.state.leaderId, team: [1, 2] });
+            allApprove(room);
+            const nonMember = [...room.state.players.keys()].find(id => !room.state.nominatedTeam.includes(id))!;
+            const senderSocket = sockets[nonMember - 1]!;
+            (senderSocket.send as any).mockClear();
+
+            room.bus.emit('mission:play-card', { senderId: nonMember, card: true });
+
+            const err = getMessageOfType(senderSocket, 'socket:error');
+            expect(err).toBeDefined();
+            expect(err.data.message).toMatch(/team/i);
         });
     });
 });

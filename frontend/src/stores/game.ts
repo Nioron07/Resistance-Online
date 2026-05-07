@@ -222,14 +222,16 @@ export const useGameStore = defineStore('game', () => {
     socket.on('state:update', d => {
       try {
         applyServerState(JSON.parse(d.state))
-      } catch (err) {
-        console.error('failed to apply state:update', err)
+      } catch (error) {
+        console.error('failed to apply state:update', error)
       }
     })
   }
 
   function applyServerState (s: any) {
-    if (!s) return
+    if (!s) {
+      return
+    }
 
     phase.value = s.phase ?? phase.value
     mission.value = s.mission ?? 0
@@ -259,9 +261,11 @@ export const useGameStore = defineStore('game', () => {
     // Rebuild mission outcomes from completed missions
     const outcomes: string[] = ['transparent', 'transparent', 'transparent', 'transparent', 'transparent']
     if (Array.isArray(s.missions)) {
-      s.missions.forEach((m: any, i: number) => {
-        if (i < 5) outcomes[i] = m?.success ? 'blue' : 'red'
-      })
+      for (const [i, m] of s.missions.entries()) {
+        if (i < 5) {
+          outcomes[i] = m?.success ? 'blue' : 'red'
+        }
+      }
     }
     missionOutcomes.value = outcomes
 
@@ -274,19 +278,29 @@ export const useGameStore = defineStore('game', () => {
     // Route the user to the page matching the current phase so a mid-game
     // refresh / reconnect lands them in the right place.
     const target = phaseRoute(phase.value)
-    if (target) router.push(`/Game/${joinCode.value}/${target}`)
+    if (target) {
+      router.push(`/Game/${joinCode.value}/${target}`)
+    }
   }
 
   function phaseRoute (p: GamePhase): string | null {
     switch (p) {
-      case 'lobby': return 'Lobby'
-      case 'role-reveal': return 'IdentitySelection'
-      case 'nomination': return 'TeamSelection'
-      case 'voting': return 'TeamVote'
-      case 'suspicion': return 'SuspicionPhase'
-      case 'mission': return 'MissionPhase'
-      case 'game-over': return 'EndState'
-      default: return null
+      case 'lobby': { return 'Lobby'
+      }
+      case 'role-reveal': { return 'IdentitySelection'
+      }
+      case 'nomination': { return 'TeamSelection'
+      }
+      case 'voting': { return 'TeamVote'
+      }
+      case 'suspicion': { return 'SuspicionPhase'
+      }
+      case 'mission': { return 'MissionPhase'
+      }
+      case 'game-over': { return 'EndState'
+      }
+      default: { return null
+      }
     }
   }
 

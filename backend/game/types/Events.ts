@@ -1,4 +1,4 @@
-import {KnownRole, MissionResult, PlayerId, PlotCardName, PlotCardType, RoleName} from './GameTypes.js';
+import {KnownRole, PlayerId, RoleName} from './GameTypes.js';
 
 // Client -> Server
 export type ClientEventsBase = {
@@ -80,15 +80,15 @@ export type InternalEvents = {
         playerId: PlayerId;
     }
 
-    'roles:assigned': {},
+    'roles:assigned': Record<string, never>,
 
-    'nomination:start': {},
+    'nomination:start': Record<string, never>,
 
     'nomination:resolve': {
         approved: boolean;
     }
 
-    'mission:start': {},
+    'mission:start': Record<string, never>,
 
     'mission:complete': {
         result: boolean;
@@ -125,7 +125,7 @@ export type ServerEvents = {
         playerId: PlayerId;
     }
 
-    'game:started': {}
+    'game:started': Record<string, never>
 
     'role:assigned': {
         role: RoleName;
@@ -146,7 +146,15 @@ export type ServerEvents = {
         playerId: PlayerId;
     }
 
-    'suspicion:started': {}
+    'mission:card-played': {
+        playerId: PlayerId;
+    }
+
+    'suspicion:received': {
+        playerId: PlayerId;
+    }
+
+    'suspicion:started': Record<string, never>
 
     'vote:result': {
         votes: Record<PlayerId, boolean>;

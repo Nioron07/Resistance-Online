@@ -1,5 +1,3 @@
-import { WebSocket } from "@fastify/websocket";
-
 export abstract class GameRoom {
     protected joinCode: number;
 
@@ -13,12 +11,12 @@ export abstract class GameRoom {
     }
 
     // ------------------ ------------------ Basic Player/Socket Managment ------------------ ------------------ \\
-    abstract addPlayer(...args: any[]): void;
-    
-    abstract removePlayer(...args: any[]): void;
-    
-    // ------------------ ------------------ Messaging ------------------ ------------------ \\
-    abstract broadcast(data: any, ...args: any[]): void;
+    abstract addPlayer(...args: unknown[]): void;
 
-    abstract broadcastState(...args: any[]): void;
+    abstract removePlayer(...args: unknown[]): void;
+
+    // ------------------ ------------------ Messaging ------------------ ------------------ \\
+    abstract broadcast(data: unknown, ...args: unknown[]): void;
+
+    abstract broadcastState(...args: unknown[]): void;
 }

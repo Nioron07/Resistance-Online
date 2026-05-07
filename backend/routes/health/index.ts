@@ -30,7 +30,7 @@ export const GET = async (_request: FastifyRequest, reply: FastifyReply) => {
 }
 
 // ------------------- ------------------- Inject the Above Methods into the Route ------------------- ------------------- \\
-async function routes(fastify: FastifyInstance, _: Object) {
+async function routes(fastify: FastifyInstance, _: object) {
   fastify.get('', GET);
 }
 

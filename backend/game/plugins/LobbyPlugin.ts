@@ -1,6 +1,7 @@
 import {GamePlugin} from "./GamePlugin.js";
 import {getRulesFor} from "../types/GameTypes.js";
 import { DAC } from "../../utils/db-queries/DataAccessClass.js";
+import { roomManager } from "../../managers/RoomManager.js";
 
 const MIN_PLAYERS = 5;
 
@@ -48,8 +49,14 @@ export class LobbyPlugin extends GamePlugin {
             }
 
             this.room.broadcast("player:left", {playerId: e.playerId});
-          
+
             await DAC.resistance.games.id(meta_data.gameid).playerId(e.playerId).remove();
+
+            // If the lobby is empty after this leave, the room is dead. Drop
+            // it from the manager immediately so codes don't accumulate.
+            if (state.players.size === 0) {
+                roomManager.removeRoom(this.room.getJoinCode());
+            }
         });
 
         bus.on("player:disconnect", 100, async (e) => {

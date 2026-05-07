@@ -17,11 +17,12 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
     try {
         // console.log(`${req.params.userid} | ${typeof req.params.userid}`);
         // console.log(`${req.query.verbosity} | ${typeof req.query.verbosity}`);
-        if (!(req.query.verbosity in ["i", "love", "javascript syntax!!!!"])) {
+        const verbosity = Number(req.query.verbosity) as ProfileVerbosity;
+        if (!Number.isInteger(verbosity) || verbosity < 0 || verbosity > 2) {
             rep.code(400).send(`Query parameter 'verbosity' must be 0, 1, or 2`);
             return;
         }
-        const user = await DAC.users.id(req.params.userid).get(req.query.verbosity);
+        const user = await DAC.users.id(req.params.userid).get(verbosity);
 
         if (user === null) {
             rep.code(404).send(`The is no user with the userid ${req.params.userid}`);
@@ -30,7 +31,7 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
 
         rep.code(200).send(user);
 
-    } catch (error) {
+    } catch (_error) {
         rep.code(500).send({
             error: 'Something went wrong while processing this request.'
         });
@@ -62,7 +63,7 @@ export const get_opts = {
         }
     }
 };
-async function routes(fastify: FastifyInstance, _: Object) {
+async function routes(fastify: FastifyInstance, _: object) {
   fastify.get('', get_opts, GET);
 }
 

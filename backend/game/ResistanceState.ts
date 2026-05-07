@@ -87,7 +87,19 @@ export class ResistanceState {
     }
 
     getNextLeader(): PlayerId {
-        return this.seatOrder[(this.seatOrder.indexOf(this.leaderId) + 1) % this.seatOrder.length]!;
+        const order = this.seatOrder;
+        if (order.length === 0) return this.leaderId;
+
+        const start = order.indexOf(this.leaderId);
+        // Walk seat order, skipping any player who is currently
+        // disconnected. If we make a full loop without finding one,
+        // fall back to the current leader.
+        for (let step = 1; step <= order.length; step++) {
+            const candidate = order[(start + step) % order.length]!;
+            const player = this.players.get(candidate);
+            if (player?.connected) return candidate;
+        }
+        return this.leaderId;
     }
 
     getTeamOf(playerId: PlayerId): 'resistance' | 'spy' {
@@ -121,7 +133,15 @@ export class ResistanceState {
     }
 
     allSusCast(): boolean {
-        return Object.keys(this.pendingSuspicions).length === this.players.size;
+        // Spy submissions are dropped server-side, so the round advances
+        // once every resistance player has submitted.
+        let resistanceCount = 0;
+        for (const player of this.players.values()) {
+            if (player.role !== undefined && teamOf(player.role) === 'resistance') {
+                resistanceCount++;
+            }
+        }
+        return Object.keys(this.pendingSuspicions).length >= resistanceCount;
     }
 
     allMissionCardsCast(): boolean {
@@ -175,6 +195,9 @@ export class ResistanceState {
             resistanceWins: this.resistanceWins,
             winner: this.winner,
             assassinationTarget: showAssassination ? this.assassinationTarget : null,
+            votedPlayerIds: Object.keys(this.pendingVotes).map(Number),
+            submittedSuspicionPlayerIds: Object.keys(this.pendingSuspicions).map(Number),
+            playedMissionCardPlayerIds: Object.keys(this.pendingMissionCards).map(Number),
         };
 
         return JSON.stringify(state);

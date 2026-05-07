@@ -1,5 +1,7 @@
 type Handler<T> = (event: T) => void
 
+const MAX_LOG_ENTRIES = 1000;
+
 export class MessageBus<E extends Record<string, unknown>> {
 
     private eventLog: {event: keyof E, data: unknown, time: number}[] = []
@@ -8,12 +10,17 @@ export class MessageBus<E extends Record<string, unknown>> {
     /**
      * Stores all the handlers of events with a priority so we can call them in order
      */
-    private handlers = new Map<keyof E, {priority: number, fn: Handler<any>}[]>()
+    // The handler list stores callbacks for many different event types, so we
+    // store them as Handler<unknown> here and rely on the typed `on` and `emit`
+    // signatures to keep callsites type-safe.
+    private handlers = new Map<keyof E, {priority: number, fn: Handler<unknown>}[]>()
 
     on<K extends keyof E>(event: K, priority: number, fn: Handler<E[K]>) {
         const list = this.handlers.get(event) ?? [];
 
-        list.push({priority, fn})
+        // Erase the specific event-type into the union storage shape; the
+        // typed `emit*` methods feed each handler the matching payload.
+        list.push({priority, fn: fn as Handler<unknown>})
         list.sort((a,b) => b.priority - a.priority)
 
         this.handlers.set(event, list)
@@ -30,9 +37,9 @@ export class MessageBus<E extends Record<string, unknown>> {
      * @param data Expected parameters of that event
      */
     emit<K extends keyof E>(event: K, data: E[K]) {
-        this.replayLog.push({event, data, time: Date.now()})
-        this.eventLog.push({event, data, time: Date.now()})
-        this.emitInternal(event, data)
+        this.pushBounded(this.replayLog, {event, data, time: Date.now()});
+        this.pushBounded(this.eventLog, {event, data, time: Date.now()});
+        this.emitInternal(event, data);
     }
 
     /**
@@ -42,7 +49,15 @@ export class MessageBus<E extends Record<string, unknown>> {
      * @param data Expected parameters of that event
      */
     emitInternal<K extends keyof E>(event: K, data: E[K]) {
-        this.eventLog.push({event, data, time: Date.now()})
-        this.handlers.get(event)?.forEach(h => h.fn(data))
+        this.pushBounded(this.eventLog, {event, data, time: Date.now()});
+        this.handlers.get(event)?.forEach(h => h.fn(data));
+    }
+
+    private pushBounded<T>(log: T[], entry: T) {
+        log.push(entry);
+        if (log.length > MAX_LOG_ENTRIES) {
+            // Trim from the front in chunks so we're not paying O(n) per emit.
+            log.splice(0, log.length - MAX_LOG_ENTRIES);
+        }
     }
 }

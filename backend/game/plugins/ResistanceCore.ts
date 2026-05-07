@@ -1,12 +1,20 @@
 import {GamePlugin} from "./GamePlugin.js";
 import {KnownRole, PlayerId, PlayerState, RoleName, teamOf} from "../types/GameTypes.js";
 import { DAC } from "../../utils/db-queries/DataAccessClass.js";
+import { roomManager } from "../../managers/RoomManager.js";
 
 export class ResistanceCore extends GamePlugin {
     protected register() {
         const { bus, state, meta_data } = this.room
 
         let cameFromMission = false;
+
+        // Send a 'socket:error' back to a single player. Best-effort: if their
+        // socket is gone we just swallow it (broadcast already handles that).
+        const notifySender = (playerId: PlayerId, message: string) => {
+            const ws = this.room.players.get(playerId);
+            if (ws) this.room.send(ws, "socket:error", { message });
+        };
 
         /**
          * role:submit -> roles:assigned IF all votes are submitted
@@ -16,7 +24,8 @@ export class ResistanceCore extends GamePlugin {
 
             state.players.get(e.senderId)!.role = e.role;
 
-            DAC.resistance.games.id(meta_data.gameid).playerId(e.senderId).update(e.role);
+            DAC.resistance.games.id(meta_data.gameid).playerId(e.senderId).update(e.role)
+                .catch(err => console.error('[DAC] playerId.update failed', err));
 
             const allSubmitted = Array.from(state.players.values()).every(p => p.role !== undefined);
             if (!allSubmitted) return;
@@ -28,7 +37,7 @@ export class ResistanceCore extends GamePlugin {
          * Independently sends each player 'role:assigned' which has their role and knownRoles based on other players roles
          * roles:assigned -> nomination:start
          */
-        bus.on("roles:assigned", 100, e => {
+        bus.on("roles:assigned", 100, _e => {
             for (const player of state.players.values()) {
                 player.knownRoles = this.buildKnownRoles(player.playerId, player.role!, state.players);
             }
@@ -50,7 +59,7 @@ export class ResistanceCore extends GamePlugin {
          * Broadcasts nomination:started
          * Changes phase to 'nomination'
          */
-        bus.on("nomination:start", 100, e => {
+        bus.on("nomination:start", 100, _e => {
             state.round = state.pendingNominations.length;
             state.count_rounds++;
             state.leaderId = state.getNextLeader();
@@ -70,13 +79,22 @@ export class ResistanceCore extends GamePlugin {
          */
         bus.on("nomination:submit", 100, e => {
             if (state.phase !== 'nomination') return;
-            if (e.senderId !== state.leaderId) return;
+            if (e.senderId !== state.leaderId) {
+                notifySender(e.senderId, 'Only the current leader can submit a nomination.');
+                return;
+            }
 
             const teamSize = state.rules!.missionSizes[state.mission];
-            if (e.team.length !== teamSize) return;
+            if (e.team.length !== teamSize) {
+                notifySender(e.senderId, `Team must have exactly ${teamSize} players for this mission.`);
+                return;
+            }
 
             // Make sure all nominated players are in the game
-            if (e.team.some(id => !state.players.has(id))) return;
+            if (e.team.some(id => !state.players.has(id))) {
+                notifySender(e.senderId, 'One or more nominated players are not in this game.');
+                return;
+            }
 
             state.nominatedTeam = e.team;
             state.phase = 'voting';
@@ -95,6 +113,10 @@ export class ResistanceCore extends GamePlugin {
             if (e.senderId in state.pendingVotes) return;
 
             state.pendingVotes[e.senderId] = e.vote;
+
+            // Notify everyone that a vote came in (without revealing the
+            // value) so the UI can show partial progress.
+            this.room.broadcast("vote:received", { playerId: e.senderId });
 
             if (!state.allVotesCast()) return;
 
@@ -140,7 +162,8 @@ export class ResistanceCore extends GamePlugin {
                     pendingNominations: state.pendingNominations.length,
                     cameFromMission
                 });
-                DAC.resistance.rounds.create(meta_data.gameid, state);
+                DAC.resistance.rounds.create(meta_data.gameid, state)
+                    .catch(err => console.error('[DAC] rounds.create failed', err));
 
                 bus.emitInternal('game:ended', {winner: 'spies', reason: 'nomination-limit'});
                 return;
@@ -152,7 +175,8 @@ export class ResistanceCore extends GamePlugin {
                     pendingNominations: state.pendingNominations.length,
                     cameFromMission
                 });
-                DAC.resistance.rounds.create(meta_data.gameid, state);
+                DAC.resistance.rounds.create(meta_data.gameid, state)
+                    .catch(err => console.error('[DAC] rounds.create failed', err));
 
                 bus.emitInternal("nomination:start", {});
                 return;
@@ -167,10 +191,21 @@ export class ResistanceCore extends GamePlugin {
          */
         bus.on("sus:submit", 100, e => {
             if (state.phase !== 'suspicion') return;
-            if (!state.players.has(e.senderId)) return;
+            const sender = state.players.get(e.senderId);
+            if (!sender) return;
             if (e.senderId in state.pendingSuspicions) return;
 
+            // Spies' suspicions are noise/manipulation — drop them entirely
+            // so they never reach the DB or any metric. Don't broadcast a
+            // 'received' either; from the room's perspective the submission
+            // never happened.
+            if (sender.role !== undefined && teamOf(sender.role) === 'spy') {
+                return;
+            }
+
             state.pendingSuspicions[e.senderId] = e.sus;
+
+            this.room.broadcast("suspicion:received", { playerId: e.senderId });
 
             if (!state.allSusCast()) return;
 
@@ -197,7 +232,8 @@ export class ResistanceCore extends GamePlugin {
                 pendingNominations: state.pendingNominations.length,
                 cameFromMission
             });
-            DAC.resistance.rounds.create(meta_data.gameid, state);
+            DAC.resistance.rounds.create(meta_data.gameid, state)
+                .catch(err => console.error('[DAC] rounds.create failed', err));
 
 
             if (e.cameFromMission) {
@@ -227,7 +263,7 @@ export class ResistanceCore extends GamePlugin {
         /**
          * Broadcasts mission:started
          */
-        bus.on('mission:start', 100, e => {
+        bus.on('mission:start', 100, _e => {
             if (state.phase !== 'mission') return;
 
             this.room.broadcast('mission:started', {
@@ -242,10 +278,15 @@ export class ResistanceCore extends GamePlugin {
          */
         bus.on('mission:play-card', 100, e => {
             if (state.phase !== 'mission') return;
-            if (!state.nominatedTeam.includes(e.senderId)) return;
+            if (!state.nominatedTeam.includes(e.senderId)) {
+                notifySender(e.senderId, 'You are not on the current mission team.');
+                return;
+            }
             if (e.senderId in state.pendingMissionCards) return;
 
             state.pendingMissionCards[e.senderId] = e.card;
+
+            this.room.broadcast("mission:card-played", { playerId: e.senderId });
 
             if (!state.allMissionCardsCast()) return;
 
@@ -291,7 +332,8 @@ export class ResistanceCore extends GamePlugin {
                     pendingNominations: state.pendingNominations.length,
                     cameFromMission
                 });
-                DAC.resistance.rounds.create(meta_data.gameid, state);
+                DAC.resistance.rounds.create(meta_data.gameid, state)
+                    .catch(err => console.error('[DAC] rounds.create failed', err));
 
                 /**
                  * @note Flushing the state is after the DAC call because I still need the data in the right format for the DB.
@@ -325,12 +367,19 @@ export class ResistanceCore extends GamePlugin {
 
             state.endWinner = e.winner;
 
-            DAC.resistance.games.id(meta_data.gameid).end(state, e.reason);
+            // Persist the result. We don't await the bus handler itself, but
+            // we do want errors to surface in the logs instead of being lost.
+            DAC.resistance.games.id(meta_data.gameid).end(state, e.reason)
+                .catch(err => console.error('[DAC] games.end failed', err));
 
             this.room.broadcast("game:ended", {
                 winner: e.winner,
                 reason: e.reason
             })
+
+            // Schedule the room for removal after the post-game grace window
+            // so the manager doesn't accumulate finished games.
+            roomManager.scheduleRemoval(this.room.getJoinCode());
         })
     }
 

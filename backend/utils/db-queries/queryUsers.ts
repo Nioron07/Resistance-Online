@@ -1,6 +1,4 @@
-import { PoolClient, QueryResult, QueryResultRow } from "pg";
-import { queryAll, queryOne, transaction } from "../db.js";
-import { ProfileVerbosity } from "../../types/user_types.js";
+import { queryOne } from "../db.js";
 
 export const userExistsQuery = `
 SELECT

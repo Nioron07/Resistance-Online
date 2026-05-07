@@ -114,7 +114,7 @@ export class TestGameState {
     /**
      * The transition function for this DFA
      */
-    delta(input: any, action?: ['left' | 'right', 'left' | 'right'] | 'transfer' | 'divide'): string | undefined {
+    delta(input: string, action?: ['left' | 'right', 'left' | 'right'] | 'transfer' | 'divide'): string | undefined {
         let other_player_idx: 0 | 1 | undefined = undefined;
         if (action !== undefined) {
             switch (this.current_state) {
@@ -188,7 +188,7 @@ export class TestGameState {
 
                 break;
 
-            default:
+            default: {
                 /**
                  * @note Edge Case: Technically speaking, this allows one to skip their turn via attacking an already dead hand.
                  * I elected to ignore fixing this as a perfect implementation of chopsticks is well outside the scope of this project.
@@ -200,10 +200,10 @@ export class TestGameState {
                 /**
                  * @note This is a very primitive and not scalable version of DLCs; however, it gets the point across.
                  * Eric came up with a design that is far superior, but far outside of the scope of this test game.
-                 * - Joseph Habisohn 2/24/2026 
+                 * - Joseph Habisohn 2/24/2026
                  */
                 if (other_hand_number == 0) return;
-                
+
                 if (this.data.death_type == 'cutoff') {
                     if (other_hand_number + hand_number >= 5) {
                         this.data.hands[1 - player]![action[1]] = 0;
@@ -212,13 +212,14 @@ export class TestGameState {
                         this.data.hands[1 - player]![action[1]] += hand_number;
 
                     }
-                    
+
                 } else {
                     this.data.hands[1 - player]![action[1]] = (other_hand_number + hand_number) % 5;
 
                 }
 
                 break;
+            }
         }
     }
 }

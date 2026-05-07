@@ -50,7 +50,7 @@ const POST: RouteHandler<Post> = async (req: FastifyRequest<Post>, rep: FastifyR
 }
 
 // ------------------- ------------------- Inject the Methods into the Route ------------------- ------------------- \\
-async function routes(fastify: FastifyInstance, _: Object) {
+async function routes(fastify: FastifyInstance, _: object) {
   fastify.post('', {
         schema: {
             querystring: {

@@ -1,69 +1,70 @@
 import { mount } from '@vue/test-utils'
-import { describe, it } from 'vitest'
-import { VSelect } from 'vuetify/components'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { VBtn, VSelect } from 'vuetify/components'
 import SuspicionPhase from '@/pages/Game/[GameID]/SuspicionPhase.vue'
 import { useGameStore } from '@/stores/game'
+import { seedGameStore } from './helpers'
 
 describe('SuspicionPhase Cases', () => {
-  it('ensure selects equal the number of spies on load', () => {
+  beforeEach(() => {
+    seedGameStore({ myId: 1, playerIds: [1, 2, 3, 4, 5] })
+  })
+
+  it('renders one player-select per spy slot on load', () => {
     const wrapper = mount(SuspicionPhase)
-    const selects = wrapper.findAllComponents(VSelect)
     const store = useGameStore()
+    const selects = wrapper.findAllComponents(VSelect)
+    // One select per spy slot (5-player game has 2 spies).
     expect(selects.length).toBe(store.numSpies)
   })
-  it('ensure select options equal players from store plus None', () => {
+
+  it('player-select options exclude my own id and include a None entry', () => {
     const wrapper = mount(SuspicionPhase)
     const store = useGameStore()
-    const selects = wrapper.findComponent(VSelect)
-    expect(selects.props('items')).toStrictEqual([...store.players, 'None'])
+    const firstSelect = wrapper.findAllComponents(VSelect)[0]!
+    const items = firstSelect.props('items') as Array<{ label: string, value: number | null }>
+    const values = items.map(i => i.value)
+    expect(values).toContain(null) // None
+    expect(values).not.toContain(store.myId)
+    // Each non-None entry must correspond to a real player.
+    for (const v of values) {
+      if (v !== null) {
+        expect(store.playerIds).toContain(v)
+      }
+    }
   })
-  it('ensure confidence select is added once player is selected', async () => {
+
+  it('selecting a player reveals a confidence dropdown for that slot', async () => {
     const wrapper = mount(SuspicionPhase)
     const store = useGameStore()
-    const select = wrapper.findComponent(VSelect)
-    await select.vm.$emit('update:modelValue', store.players[0])
+    const targetId = store.playerIds.find(id => id !== store.myId)!
+
+    const firstSelect = wrapper.findAllComponents(VSelect)[0]!
+    await firstSelect.vm.$emit('update:model-value', targetId)
     await wrapper.vm.$nextTick()
+
     const selects = wrapper.findAllComponents(VSelect)
+    // numSpies player-selects + one new confidence select for the chosen slot.
     expect(selects.length).toBe(store.numSpies + 1)
-    expect(selects[1].props('items')).toStrictEqual(['Unsure', 'Somewhat Sure', 'Confident', 'Very Confident'])
   })
-  it('ensure player list removes already selected players', async () => {
-    const wrapper = mount(SuspicionPhase)
+
+  it('submitting flushes the selections through submitSuspicions', async () => {
     const store = useGameStore()
-    const select = wrapper.findComponent(VSelect)
-    await select.vm.$emit('update:modelValue', store.players[0])
-    await wrapper.vm.$nextTick()
-    const selects = wrapper.findAllComponents(VSelect)
-    const expectedPlayers = [...store.players.filter(p => p !== store.players[0]), 'None']
-    expect(selects[2].props('items')).toStrictEqual(expectedPlayers)
-  })
-  it('ensure suspicion emit is formatted correctly', async () => {
+    const submitSpy = vi.spyOn(store, 'submitSuspicions').mockImplementation(() => {})
+
     const wrapper = mount(SuspicionPhase)
-    const store = useGameStore()
-    let selects = wrapper.findAllComponents(VSelect)
+    const targetId = store.playerIds.find(id => id !== store.myId)!
 
-    await selects[0].vm.$emit('update:modelValue', store.players[0])
+    const firstSelect = wrapper.findAllComponents(VSelect)[0]!
+    await firstSelect.vm.$emit('update:model-value', targetId)
     await wrapper.vm.$nextTick()
-    await wrapper.find('.v-btn').trigger('click')
-    await wrapper.vm.$nextTick()
-    expect(wrapper.emitted('suspicions')).toBeTruthy()
-    expect(wrapper.emitted('suspicions')![0][0]).toEqual({ [store.players[0]]: 'Unsure' })
 
-    await selects[1].vm.$emit('update:modelValue', store.players[1])
-    selects = wrapper.findAllComponents(VSelect)
-    await selects[3].vm.$emit('update:modelValue', 'Confident')
+    const submitBtn = wrapper.findAllComponents(VBtn).at(-1)!
+    await submitBtn.trigger('click')
     await wrapper.vm.$nextTick()
-    await wrapper.find('.v-btn').trigger('click')
-    await wrapper.vm.$nextTick()
-    expect(wrapper.emitted('suspicions')).toBeTruthy()
-    expect(wrapper.emitted('suspicions')![1][0]).toEqual({ [store.players[0]]: 'Unsure', [store.players[1]]: 'Confident' })
 
-    await selects[0].vm.$emit('update:modelValue', 'None')
-    await wrapper.vm.$nextTick()
-    await selects[0].vm.$emit('update:modelValue', 'None')
-    await wrapper.vm.$nextTick()
-    await wrapper.find('.v-btn').trigger('click')
-    await wrapper.vm.$nextTick()
-    expect(wrapper.emitted('suspicions')![2][0]).toEqual({})
+    expect(submitSpy).toHaveBeenCalledTimes(1)
+    const payload = submitSpy.mock.calls[0]![0] as Record<number, number>
+    expect(payload[targetId]).toBeGreaterThanOrEqual(1) // default confidence is 1
   })
 })

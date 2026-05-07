@@ -21,6 +21,38 @@ export class GameSocket {
     return this.open()
   }
 
+  send<K extends keyof ClientEventsBase> (event: K, data: ClientEventsBase[K]) {
+    const msg = JSON.stringify({ event, data })
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(msg)
+    } else {
+      this.queue.push(msg)
+    }
+  }
+
+  on<K extends keyof ServerEvents> (event: K, fn: Listener<K>): () => void {
+    let set = this.listeners.get(event)
+    if (!set) {
+      set = new Set()
+      this.listeners.set(event, set)
+    }
+    set.add(fn)
+    return () => set!.delete(fn)
+  }
+
+  close () {
+    this.intentionalClose = true
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+    this.ws?.close()
+    this.ws = null
+    this.listeners.clear()
+    this.queue = []
+    this.joinCode = null
+  }
+
   private open (): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.joinCode) {
@@ -91,41 +123,9 @@ export class GameSocket {
     console.warn(`game socket: reconnect attempt ${this.reconnectAttempts} in ${delay}ms`)
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null
-      this.open().catch(err => {
-        console.warn('game socket: reconnect failed', err)
+      this.open().catch(error => {
+        console.warn('game socket: reconnect failed', error)
       })
     }, delay)
-  }
-
-  send<K extends keyof ClientEventsBase> (event: K, data: ClientEventsBase[K]) {
-    const msg = JSON.stringify({ event, data })
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(msg)
-    } else {
-      this.queue.push(msg)
-    }
-  }
-
-  on<K extends keyof ServerEvents> (event: K, fn: Listener<K>): () => void {
-    let set = this.listeners.get(event)
-    if (!set) {
-      set = new Set()
-      this.listeners.set(event, set)
-    }
-    set.add(fn)
-    return () => set!.delete(fn)
-  }
-
-  close () {
-    this.intentionalClose = true
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer)
-      this.reconnectTimer = null
-    }
-    this.ws?.close()
-    this.ws = null
-    this.listeners.clear()
-    this.queue = []
-    this.joinCode = null
   }
 }
