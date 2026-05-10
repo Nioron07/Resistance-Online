@@ -100,7 +100,7 @@ const heroClass = computed(() => ({
   border: 1px solid rgb(var(--v-theme-border));
   border-radius: 8px;
   margin-bottom: 6px;
-  height: 300px;
+  height: 350px;
   overflow: hidden;
 }
 
