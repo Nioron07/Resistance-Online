@@ -41,7 +41,6 @@ const INDEX_SQL = `
     JOIN games g ON g.id = pgm.game_id
     JOIN player_profiles pp ON pp.id = pgm.user_id
     WHERE g.end_timestamp IS NOT NULL
-      AND (g.outcome_type IS NULL OR g.outcome_type <> 'forfeit')
     ORDER BY pgm.user_id ASC, g.end_timestamp ASC, g.id ASC;
 `;
 
@@ -54,7 +53,6 @@ const LIFETIME_SQL = `
     JOIN games g ON g.id = pgm.game_id
     JOIN player_profiles pp ON pp.id = pgm.user_id
     WHERE g.end_timestamp IS NOT NULL
-      AND (g.outcome_type IS NULL OR g.outcome_type <> 'forfeit')
     GROUP BY pgm.user_id, pp.username, pp.pfp
     ORDER BY total DESC, games DESC, pgm.user_id ASC
     LIMIT $1;
@@ -108,8 +106,13 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
             rows,
         });
     } catch (error) {
-        console.error(error);
-        rep.code(500).send({ error: 'Something went wrong while computing the leaderboard.' });
+        // Log the full stack to surface schema mismatches (e.g. a missing
+        // column on `games`) rather than masking them as a generic 500.
+        console.error('[GET /api/leaderboard] failed:', error);
+        rep.code(500).send({
+            error: 'Something went wrong while computing the leaderboard.',
+            detail: error instanceof Error ? error.message : String(error),
+        });
     }
 };
 

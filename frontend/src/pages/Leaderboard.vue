@@ -2,7 +2,6 @@
   <v-container class="r-leaderboard" max-width="1100">
     <header class="r-header">
       <h1 class="r-title">LEADERBOARD</h1>
-      <p class="r-sub">The board re-weights games toward recent play (default α=0.95).</p>
     </header>
 
     <div class="r-tabs">
@@ -138,13 +137,6 @@
   letter-spacing: 0.04em;
   margin: 0;
 }
-.r-sub {
-  color: rgb(var(--v-theme-on-surface-muted));
-  font-size: 0.825rem;
-  letter-spacing: 0.04em;
-  margin-top: 4px;
-}
-
 .r-tabs {
   display: flex;
   flex-wrap: wrap;

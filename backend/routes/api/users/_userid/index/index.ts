@@ -27,7 +27,6 @@ const pointsQuery = `
     JOIN games g ON g.id = pgm.game_id
     WHERE pgm.user_id = $1
       AND g.end_timestamp IS NOT NULL
-      AND (g.outcome_type IS NULL OR g.outcome_type <> 'forfeit')
     ORDER BY g.end_timestamp ASC, g.id ASC;
 `;
 

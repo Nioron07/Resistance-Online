@@ -1,8 +1,7 @@
 <template>
   <v-container class="r-home" max-width="900">
     <header class="r-hero">
-      <h1 class="r-hero-title">RESISTANCE<span class="r-hero-dot">.</span></h1>
-      <p class="r-hero-sub">Online deduction. Five missions. Two teams. One traitor — or two.</p>
+      <h1 class="r-hero-title">ResistanceOnline</h1>
     </header>
 
     <div class="r-grid">
@@ -139,13 +138,6 @@
   letter-spacing: 0.04em;
   margin: 0;
   color: rgb(var(--v-theme-on-surface));
-}
-.r-hero-dot { color: var(--r-spy); }
-.r-hero-sub {
-  margin-top: 8px;
-  color: rgb(var(--v-theme-on-surface-muted));
-  font-size: 0.875rem;
-  letter-spacing: 0.04em;
 }
 
 .r-grid {

@@ -67,7 +67,6 @@ const HISTORY_SQL = `
     JOIN games g ON g.id = pgm.game_id
     WHERE pgm.user_id = ANY($1::bigint[])
       AND g.end_timestamp IS NOT NULL
-      AND (g.outcome_type IS NULL OR g.outcome_type <> 'forfeit')
     ORDER BY pgm.user_id ASC, g.end_timestamp ASC, g.id ASC;
 `;
 
