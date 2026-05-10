@@ -8,7 +8,7 @@
       />
 
       <div class="r-end-header-right">
-        <MissionTracker :outcomes="data?.outcome.missionStatuses ?? []" />
+        <MissionTracker :outcomes="data?.outcome.missionStatuses ?? []" :player-count="endStatePlayerCount" />
 
         <div class="r-end-totals">
           <span class="r-team-total r-team-total-resistance tabular-nums">
@@ -181,6 +181,13 @@
   const expandedPlayer = ref<number | null>(null)
   const mobileSide = ref<'resistance' | 'spy'>('resistance')
   const copied = ref(false)
+
+  const endStatePlayerCount = computed(() => {
+    const r = data.value?.teams.resistance.players.length ?? 0
+    const s = data.value?.teams.spy.players.length ?? 0
+    const total = r + s
+    return total > 0 ? total : null
+  })
 
   const gameid = computed(() => {
     const v = route.params.GameID ?? route.params.gameID

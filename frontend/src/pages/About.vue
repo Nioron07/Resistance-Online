@@ -16,6 +16,7 @@
 
       <ContributorCard
         bio="Hey, my name is Joseph Habisohn and I am studying Computer Science at the University of Illinois at Urbana-Champaign. My current interests include the creation of person-first software and the application of software in robotics"
+        :image-src="joePic"
         :links="joeLinks"
         name="JOSEPH HABISOHN"
       />
@@ -36,6 +37,7 @@
 </template>
 
 <script setup lang="ts">
+  import joePic from '@assets/JoeSax.jpg'
   import logoArt from '@/assets/personal-logo.txt?raw'
   import ContributorCard from '@/components/ContributorCard.vue'
 

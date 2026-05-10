@@ -30,7 +30,7 @@
     </template>
 
     <div class="r-tracker-container">
-      <MissionTracker :dense="smAndDown" :outcomes="missionOutcomesAsBool" />
+      <MissionTracker :dense="smAndDown" :outcomes="missionOutcomesAsBool" :player-count="game.playerCount" />
     </div>
 
     <template #append>
