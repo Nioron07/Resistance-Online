@@ -15,9 +15,9 @@
       />
 
       <ContributorCard
-        bio="Placeholder bio for the second contributor."
-        :links="placeholderLinks"
-        name="CONTRIBUTOR TWO"
+        bio="Hey, my name is Joseph Habisohn and I am studying Computer Science at the University of Illinois at Urbana-Champaign. My current interests include the creation of person-first software and the application of software in robotics"
+        :links="joeLinks"
+        name="JOSEPH HABISOHN"
       />
 
       <ContributorCard
@@ -47,7 +47,14 @@
       icon: 'mdi-linkedin',
     },
   ]
-
+  const joeLinks = [
+    { label: 'GitHub', href: 'https://github.com/joebewon', icon: 'mdi-github' },
+    {
+      label: 'LinkedIn',
+      href: 'https://www.linkedin.com/in/joseph-habisohn-a6245a321/',
+      icon: 'mdi-linkedin',
+    },
+  ]
   // Placeholder until the other three contributors fill in their links.
   const placeholderLinks = [{ label: 'GitHub', href: '#', icon: 'mdi-github' }]
 </script>

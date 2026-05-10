@@ -11,7 +11,7 @@
         :alt="`${name} portrait`"
         class="r-contrib-img"
         :src="imageSrc"
-      />
+      >
 
       <div v-else class="r-contrib-fallback">
         <v-icon icon="mdi-account" size="64" />
@@ -44,40 +44,40 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+  import { computed } from 'vue'
 
-interface ContribLink {
-  label: string;
-  href: string;
-  icon?: string;
-}
+  interface ContribLink {
+    label: string
+    href: string
+    icon?: string
+  }
 
-const props = withDefaults(
-  defineProps<{
-    name: string;
-    bio?: string;
-    /** Mutually exclusive with imageSrc — if both are present, ASCII wins. */
-    asciiArt?: string;
-    imageSrc?: string;
-    links?: ContribLink[];
-  }>(),
-  {
-    bio: "",
-    asciiArt: "",
-    imageSrc: "",
-    links: () => [],
-  },
-);
+  const props = withDefaults(
+    defineProps<{
+      name: string
+      bio?: string
+      /** Mutually exclusive with imageSrc — if both are present, ASCII wins. */
+      asciiArt?: string
+      imageSrc?: string
+      links?: ContribLink[]
+    }>(),
+    {
+      bio: '',
+      asciiArt: '',
+      imageSrc: '',
+      links: () => [],
+    },
+  )
 
-/**
- * Different hero kinds need slightly different padding / sizing rules.
- * The class hook lets us scope those without conflating selectors.
- */
-const heroClass = computed(() => ({
-  "r-contrib-hero-ascii": !!props.asciiArt,
-  "r-contrib-hero-img": !props.asciiArt && !!props.imageSrc,
-  "r-contrib-hero-empty": !props.asciiArt && !props.imageSrc,
-}));
+  /**
+   * Different hero kinds need slightly different padding / sizing rules.
+   * The class hook lets us scope those without conflating selectors.
+   */
+  const heroClass = computed(() => ({
+    'r-contrib-hero-ascii': !!props.asciiArt,
+    'r-contrib-hero-img': !props.asciiArt && !!props.imageSrc,
+    'r-contrib-hero-empty': !props.asciiArt && !props.imageSrc,
+  }))
 </script>
 
 <style scoped>
