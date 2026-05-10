@@ -74,6 +74,7 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
                 won,
                 outcomeType: r.outcome_type,
                 missionStatuses: r.mission_statuses ?? [],
+                playerCount: r.players ? Object.keys(r.players).length : 0,
             };
         });
 

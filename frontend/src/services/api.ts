@@ -50,6 +50,7 @@ export interface UserGameLogEntry {
   won: boolean | null
   outcomeType: string | null
   missionStatuses: boolean[]
+  playerCount: number
 }
 
 export interface UserGameLog {

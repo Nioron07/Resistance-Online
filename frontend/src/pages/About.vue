@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-  import joePic from '@assets/JoeSax.jpg'
+  import joePic from '@/assets/JoeSax.jpg'
   import logoArt from '@/assets/personal-logo.txt?raw'
   import ContributorCard from '@/components/ContributorCard.vue'
 

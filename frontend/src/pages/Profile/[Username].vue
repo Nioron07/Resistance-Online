@@ -120,7 +120,7 @@
         </template>
 
         <template #cell.missions="{ row }">
-          <MissionTracker dense :outcomes="row.missionStatuses" />
+          <MissionTracker dense :outcomes="row.missionStatuses" :player-count="row.playerCount" />
         </template>
       </SideTable>
 
