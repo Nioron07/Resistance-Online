@@ -49,11 +49,22 @@
           @click="router.push(`/Profile/${appStore.user?.username}`)"
         />
 
-        <v-list-item prepend-icon="mdi-logout" title="Logout" @click="appStore.logout()" />
+        <v-list-item
+          prepend-icon="mdi-logout"
+          title="Logout"
+          @click="
+            appStore.logout();
+            router.push('/Login/Login');
+          "
+        />
       </template>
 
       <template v-else>
-        <v-list-item prepend-icon="mdi-login" title="Login" @click="router.push('/Login/Login')" />
+        <v-list-item
+          prepend-icon="mdi-login"
+          title="Login"
+          @click="router.push('/Login/Login')"
+        />
       </template>
     </v-list>
   </v-navigation-drawer>
@@ -72,16 +83,36 @@
       </template>
 
       <v-list density="compact" nav>
-        <v-list-item prepend-icon="mdi-home" title="Home" @click="router.push('/')" />
-        <v-list-item prepend-icon="mdi-trophy" title="Leaderboard" @click="router.push('/Leaderboard')" />
+        <v-list-item
+          prepend-icon="mdi-home"
+          title="Home"
+          @click="router.push('/')"
+        />
+        <v-list-item
+          prepend-icon="mdi-trophy"
+          title="Leaderboard"
+          @click="router.push('/Leaderboard')"
+        />
 
         <template v-if="appStore.isAuthenticated">
-          <v-list-item prepend-icon="mdi-chart-bar" title="My Stats" @click="router.push(`/Profile/${appStore.user?.username}`)" />
-          <v-list-item prepend-icon="mdi-logout" title="Logout" @click="appStore.logout()" />
+          <v-list-item
+            prepend-icon="mdi-chart-bar"
+            title="My Stats"
+            @click="router.push(`/Profile/${appStore.user?.username}`)"
+          />
+          <v-list-item
+            prepend-icon="mdi-logout"
+            title="Logout"
+            @click="appStore.logout()"
+          />
         </template>
 
         <template v-else>
-          <v-list-item prepend-icon="mdi-login" title="Login" @click="router.push('/Login/Login')" />
+          <v-list-item
+            prepend-icon="mdi-login"
+            title="Login"
+            @click="router.push('/Login/Login')"
+          />
         </template>
       </v-list>
     </v-menu>
@@ -89,27 +120,29 @@
 </template>
 
 <script setup lang="ts">
-  import { computed } from 'vue'
-  import { useRoute, useRouter } from 'vue-router'
-  import { useDisplay } from 'vuetify'
-  import { useAppStore } from '@/stores/app'
+import { computed } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useDisplay } from "vuetify";
+import { useAppStore } from "@/stores/app";
 
-  const display = useDisplay()
-  const router = useRouter()
-  const route = useRoute()
-  const appStore = useAppStore()
+const display = useDisplay();
+const router = useRouter();
+const route = useRoute();
+const appStore = useAppStore();
 
-  const userIdLabel = computed(() => appStore.user?.id ? `#${appStore.user.id}` : '')
+const userIdLabel = computed(() =>
+  appStore.user?.id ? `#${appStore.user.id}` : "",
+);
 
-  const pageTitle = computed(() => {
-    const p = route.path
-    if (p === '/') return 'Resistance'
-    if (p.startsWith('/Leaderboard')) return 'Leaderboard'
-    if (p.startsWith('/Profile')) return 'My Stats'
-    if (p.startsWith('/Game')) return 'Game'
-    if (p.startsWith('/Login')) return 'Sign In'
-    return 'Resistance'
-  })
+const pageTitle = computed(() => {
+  const p = route.path;
+  if (p === "/") return "Resistance";
+  if (p.startsWith("/Leaderboard")) return "Leaderboard";
+  if (p.startsWith("/Profile")) return "My Stats";
+  if (p.startsWith("/Game")) return "Game";
+  if (p.startsWith("/Login")) return "Sign In";
+  return "Resistance";
+});
 </script>
 
 <style scoped>
