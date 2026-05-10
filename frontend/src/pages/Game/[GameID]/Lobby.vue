@@ -1,135 +1,129 @@
 <template>
-  <v-card class="ma-4 pa-4" elevation="8" style="width: fit-content; justify-self: center;">
-    <!-- Join Code -->
-    <v-card-title class="text-center">
-      <div class="d-flex align-center justify-center ga-2">
-        <span>Join Code: {{ $route.params.GameID }}</span>
-        <v-btn icon="mdi-content-copy" size="x-small" variant="text" @click="copyCode" />
-      </div>
-    </v-card-title>
+  <div class="r-phase">
+    <v-card class="r-phase-card pa-6">
+      <header class="r-phase-header">
+        <div class="r-phase-eyebrow">LOBBY</div>
 
-    <!-- Player Count -->
-    <div class="d-flex justify-center my-2 ga-2">
-      <v-chip color="primary" label size="large">
-        <v-icon icon="mdi-account-group" start />
-        {{ game.playerCount }} / 10 Players
-      </v-chip>
+        <div class="r-code-line">
+          <span class="r-code-label">CODE</span>
+          <span class="r-code-value tabular-nums">{{ $route.params.GameID }}</span>
+          <v-btn icon="mdi-content-copy" size="x-small" variant="text" @click="copyCode" />
+          <span v-if="copied" class="text-medium-emphasis ml-1">copied</span>
+        </div>
 
-      <v-chip v-if="game.playerCount < 5" color="warning" label size="large">
-        Need {{ 5 - game.playerCount }} more
-      </v-chip>
-    </div>
+        <div class="r-count-row">
+          <span class="r-count-pill tabular-nums">
+            <v-icon icon="mdi-account-group" size="small" />
+            {{ game.playerCount }} / 10
+          </span>
 
-    <v-card-subtitle class="text-center mb-2">
-      {{ game.isHost ? 'Player #1 is the starting leader.' : 'Waiting for host to start...' }}
-    </v-card-subtitle>
+          <span v-if="game.playerCount < 5" class="r-count-pill r-count-warn tabular-nums">
+            NEED {{ 5 - game.playerCount }} MORE
+          </span>
+        </div>
 
-    <!-- Player List -->
-    <v-card-text>
+        <p class="r-phase-sub mt-2">
+          {{ game.isHost ? 'You are the host. Player #1 is the starting leader.' : 'Waiting for the host to start…' }}
+        </p>
+      </header>
+
       <draggable
         v-if="game.isHost"
         v-model="game.playerIds"
         :animation="200"
-        class="d-flex flex-wrap justify-center"
+        class="r-player-grid"
         item-key="id"
-        style="max-width: 700px; margin: 0 auto;"
       >
         <template #item="{ element: id, index }">
-          <div class="pa-1" style="cursor: grab;">
-            <v-badge
-              :color="index === 0 ? 'primary' : 'grey'"
-              :content="index === 0 ? '★' : index + 1"
-              location="top start"
-            >
-              <PlayerCard
-                :avatar="game.playerProfiles[id]?.avatar"
-                :selected="index === 0"
-                :username="game.playerProfiles[id]?.username ?? `Player ${id}`"
-              />
-            </v-badge>
-          </div>
-        </template>
-      </draggable>
+          <div class="r-player-slot">
+            <span class="r-seat-badge tabular-nums" :class="{ 'r-seat-leader': index === 0 }">
+              {{ index === 0 ? '★' : index + 1 }}
+            </span>
 
-      <div v-else class="d-flex flex-wrap justify-center" style="max-width: 700px; margin: 0 auto;">
-        <div v-for="(id, index) in game.playerIds" :key="id" class="pa-1">
-          <v-badge
-            :color="index === 0 ? 'primary' : 'grey'"
-            :content="index === 0 ? '★' : index + 1"
-            location="top start"
-          >
             <PlayerCard
               :avatar="game.playerProfiles[id]?.avatar"
               :selected="index === 0"
               :username="game.playerProfiles[id]?.username ?? `Player ${id}`"
             />
-          </v-badge>
+          </div>
+        </template>
+      </draggable>
+
+      <div v-else class="r-player-grid">
+        <div v-for="(id, index) in game.playerIds" :key="id" class="r-player-slot">
+          <span class="r-seat-badge tabular-nums" :class="{ 'r-seat-leader': index === 0 }">
+            {{ index === 0 ? '★' : index + 1 }}
+          </span>
+
+          <PlayerCard
+            :avatar="game.playerProfiles[id]?.avatar"
+            :selected="index === 0"
+            :username="game.playerProfiles[id]?.username ?? `Player ${id}`"
+          />
         </div>
       </div>
-    </v-card-text>
 
-    <!-- Start Game (host only) -->
-    <div v-if="game.isHost" class="d-flex justify-center mt-2">
       <v-btn
+        v-if="game.isHost"
+        block
+        class="mt-5 r-start-btn"
         color="primary"
         :disabled="game.playerCount < 5"
         prepend-icon="mdi-play"
+        size="large"
+        variant="flat"
         @click="startGame"
       >
-        Start Game
+        START GAME
       </v-btn>
-    </div>
 
-    <!-- Loading Screen Tips -->
-    <div class="text-center mt-4 text-medium-emphasis" style="max-width: 600px; margin: 0 auto; white-space: normal; word-wrap: break-word;">
-      <v-icon class="mr-1" icon="mdi-lightbulb-outline" size="small" />
+      <div class="r-tip">
+        <v-icon class="mr-1" icon="mdi-lightbulb-outline" size="small" />
 
-      <transition mode="out-in" name="fade">
-        <span :key="currentTip">{{ tips[currentTip] }}</span>
-      </transition>
-    </div>
-  </v-card>
+        <transition mode="out-in" name="fade">
+          <span :key="currentTip">{{ tips[currentTip] }}</span>
+        </transition>
+      </div>
+    </v-card>
+  </div>
 </template>
 
 <script setup lang="ts">
   import { onUnmounted, ref } from 'vue'
   import { useRoute } from 'vue-router'
   import draggable from 'vuedraggable'
+  import PlayerCard from '@/components/PlayerCard.vue'
   import { useGameStore } from '@/stores/game'
 
   const route = useRoute()
   const game = useGameStore()
+  const copied = ref(false)
 
   const tips = [
-    'EVERYONE IS LYING TO YOU, do not trust anyone for any reason, not even yourself.',
-    'Find people you can trust, either by watching their behavior, or by having them show you their character card if the oppourtunity arises.',
-    'Your vote matters! You never know if your vote could be the deciding one until it\'s flipped, so value it.',
-    'As a spy, don\'t tell people you\'re a spy, unless you prefer it that way.',
-    'Looking for a great dinner at an even better price? Jurassic grill at 404 E Green St #5866, Champaign, IL 61820 has you covered!',
-    'And if you can\'t go to the brick-and-mortar location, stop by at one of the food trucks across campus!',
-    'James, sometimes I\'m not a spy, you got to believe me dude, it happens I promise.',
-    'When distributing plot cards, it may be beneficial to give multiple to someone untrustworthy to force them to reveal their card. But beware, it could allow them to steal leadership or null a vote if they have nefarious intentions...',
-    'Some missions require 2 Fail cards to fail. Communication amongst spies is key for these difficult missions. Remember that Jason.',
-    'During the reveal phase, it is imperative all spies know who eachother are. A simple raise of the hand, thumbs up, or gentle caress of the cheek can help ensure everyone remembers who\'s who.',
-    'Are you sure the Resistance are on the right side of history? Will your fight be looked at by future generations fondly? Have you considered there\'s a reason things are the way they are?',
-    'Even though eyes are closed, certain parts of the body twitch audibly when spies look around for each other. Keep an ear out.',
-    'Staying active in conversations is helpful for both spies and Resistance members, but can also bring added suspicion depending on what is said.',
-    'As a spy, being predictable is a death sentence, even to yourself. Never think about your next move.',
-    'https://youtu.be/DUENzjE9Jwg',
-    'Remember! Only spies can choose to put in a fail. Resistance players must put in a success.',
-    'Also try Avalon!',
-    'As commander, try to gain the trust of a fellow Resistance member and have them take the fall. After all, good generals throw their subbordinates under the bus.',
-    'Don\'t do it, don\'t put in that fail card. Ah! Nope, I see you about to put a fail in. Don\'t do it. I\'m serious now, put it back. Put that success in. Good job. Proud of you.',
+    'EVERYONE IS LYING TO YOU. Trust no one — not even yourself.',
+    'Your vote matters; you never know if it\'s the deciding one.',
+    'As a spy, predictability is a death sentence. Vary your behavior.',
+    'During role reveal, sync up with fellow spies — a thumbs-up is plenty.',
+    'Some missions need 2 fail cards. Coordinate with your spy partner.',
+    'Watch hands during reveal — fidgets give away identities.',
+    'Stay engaged in conversation. Silence is a tell.',
+    'Resistance: only spies can play fail. You always play success.',
   ]
 
-  const currentTip = ref(Math.round(Math.random() * tips.length))
+  const currentTip = ref(Math.floor(Math.random() * tips.length))
   const tipInterval = setInterval(() => {
     currentTip.value = (currentTip.value + 1) % tips.length
   }, 10_000)
   onUnmounted(() => clearInterval(tipInterval))
 
-  function copyCode () {
-    navigator.clipboard.writeText(String(route.params.GameID ?? ''))
+  async function copyCode () {
+    try {
+      await navigator.clipboard.writeText(String(route.params.GameID ?? ''))
+      copied.value = true
+      setTimeout(() => {
+        copied.value = false
+      }, 1500)
+    } catch { /* ignore */ }
   }
 
   function startGame () {
@@ -138,12 +132,122 @@
 </script>
 
 <style scoped>
+.r-phase {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px;
+  min-height: 100%;
+}
+.r-phase-card {
+  width: 100%;
+  max-width: 800px;
+  background-color: rgba(19, 23, 32, 0.85) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgb(var(--v-theme-border)) !important;
+  border-radius: 12px;
+}
+.r-phase-header { text-align: center; margin-bottom: 16px; }
+.r-phase-eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  color: rgb(var(--v-theme-on-surface-muted));
+}
+.r-code-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.r-code-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: rgb(var(--v-theme-on-surface-muted));
+}
+.r-code-value {
+  font-size: 1.6rem;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  color: rgb(var(--v-theme-on-surface));
+}
+.r-count-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.r-count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid rgb(var(--v-theme-border));
+  border-radius: 4px;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  color: rgb(var(--v-theme-on-surface));
+}
+.r-count-warn {
+  border-color: rgba(245, 158, 11, 0.5);
+  color: var(--r-warning);
+}
+.r-phase-sub {
+  font-size: 0.8rem;
+  color: rgb(var(--v-theme-on-surface-muted));
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.r-player-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.r-player-slot {
+  position: relative;
+  cursor: grab;
+}
+.r-seat-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  background-color: rgba(10, 14, 20, 0.85);
+  border: 1px solid rgb(var(--v-theme-border));
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: rgb(var(--v-theme-on-surface-muted));
+}
+.r-seat-leader {
+  border-color: var(--r-resistance);
+  color: var(--r-resistance);
+}
+
+.r-start-btn {
+  font-weight: 500;
+  letter-spacing: 0.12em;
+}
+
+.r-tip {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: rgb(var(--v-theme-on-surface-muted));
+  letter-spacing: 0.02em;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .fade-enter-active,
-.fade-leave-active {
-    transition: opacity 0.4s ease;
-}
+.fade-leave-active { transition: opacity 0.4s ease; }
 .fade-enter-from,
-.fade-leave-to {
-    opacity: 0;
-}
+.fade-leave-to { opacity: 0; }
 </style>

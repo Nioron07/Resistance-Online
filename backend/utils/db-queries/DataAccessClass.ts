@@ -1,9 +1,25 @@
 import { PoolClient, QueryResult, QueryResultRow } from "pg";
 import { ResistanceState } from "../../game/ResistanceState.js";
 import * as db from "../db.js"
-import { MissionResult, RoleName, teamOf } from "../../game/types/GameTypes.js";
+import { MissionCardRecord, MissionResult, RoleName, teamOf } from "../../game/types/GameTypes.js";
 import { ProfileVerbosity } from "../../types/user_types.js";
 import { queryAll, queryOne } from "../db.js";
+import { metricsRowsFromState } from "../../game/metrics/stateToRows.js";
+import { computeGamePoints } from "../../game/metrics/points.js";
+
+/**
+ * Build the per-player mission card record persisted in
+ * `voting_rounds.mission_cards`. Returns null when no cards are present
+ * (e.g., the round didn't go on a mission).
+ */
+function buildMissionCardsRecord(cards: MissionCardRecord[]): Record<string, 'success' | 'fail'> | null {
+    const out: Record<string, 'success' | 'fail'> = {};
+    for (const c of cards) {
+        if (c.playerId === undefined) continue;
+        out[String(c.playerId)] = c.card ? 'success' : 'fail';
+    }
+    return Object.keys(out).length === 0 ? null : out;
+}
 
 /**
  * @class
@@ -267,6 +283,9 @@ export abstract class DAC {
                             // Snapshot synchronously, before any await, so the
                                 // values we persist can't drift if ResistanceCore
                                 // mutates state while the transaction runs.
+                                // metricsRowsFromState reads the live `players`
+                                // Map; must run BEFORE structuredClone strips it.
+                                const pointsRows = metricsRowsFromState(state, gameid);
                                 const _state: ResistanceState = structuredClone(state);
                                 const winningTeam: 'spy' | 'resistance' | null =
                                     _state.endWinner === 'spies' ? 'spy'
@@ -307,6 +326,25 @@ export abstract class DAC {
                                             player_won ? 1 : 0,
                                             { [gameid]: player_won },
                                         ]));
+                                    }
+
+                                    // Per-(game, player) point totals for the
+                                    // R/S/P-Index pipeline. Skipped entirely if
+                                    // the game ended in a tie/null winner —
+                                    // partial data shouldn't pollute the index.
+                                    if (winningTeam !== null) {
+                                        for (const playerId of _state.seatOrder) {
+                                            const result = computeGamePoints(String(playerId), pointsRows);
+                                            if (!result) continue;
+                                            queries.push(client.query(DAC.queries.resistance.games.id.end.playerGameMetrics, [
+                                                gameid,
+                                                playerId,
+                                                result.side,
+                                                result.points,
+                                                result.breakdown,
+                                                result.catalogVersion,
+                                            ]));
+                                        }
                                     }
 
                                     // Wait for everything inside the transaction so
@@ -356,6 +394,15 @@ export abstract class DAC {
                 // callback it would race with post-DAC state mutations in
                 // ResistanceCore (pendingNominations clear, leader rotation, etc.).
                 const state_copy: ResistanceState = structuredClone(state);
+                // Per-player mission cards for the just-played mission (if any).
+                // Only attached when the last nomination was approved AND a
+                // mission was actually played; otherwise null.
+                const lastMission = state_copy.missions.at(-1);
+                const lastNomLocal = state_copy.pendingNominations.at(-1);
+                const missionCards: Record<string, 'success' | 'fail'> | null =
+                    (lastNomLocal?.outcome === true && lastMission)
+                        ? buildMissionCardsRecord(lastMission.cards)
+                        : null;
                 return DAC.run(async () => {
                     return (await db.transaction<QueryResult<{ id: number }>>((client: PoolClient): Promise<QueryResult<{ id: number }>> => {
                         const lastNomination = state_copy.pendingNominations.at(-1);
@@ -370,9 +417,10 @@ export abstract class DAC {
                             lastNomination?.outcome,                                                    // voting_rounds.vote_status
                             !lastNomination?.outcome ? null : state_copy.missions.at(-1)?.success,      // voting_rounds.mission_status
                             lastNomination?.outcome === undefined ? {} : state_copy.pendingVotes,       // voting_rounds.mission_details
-                            state_copy.pendingSuspicions                                                // voting_rounds.suspicions
+                            state_copy.pendingSuspicions,                                               // voting_rounds.suspicions
+                            missionCards                                                                // voting_rounds.mission_cards
                         ]);
-    
+
                     })).rows[0]!.id;
                 });
             },
@@ -448,9 +496,9 @@ export abstract class DAC {
                 /**
                  * @async
                  * @function
-                 * 
+                 *
                  * Function that returns the profile of the user that has userid `@userid`
-                 * 
+                 *
                  * @param { number } userid `number` The userid to look for. Recieved from this functions parent `id()`.
                  * @param { ProfileVerbosity } verbosity `ProfileVerbosity` The verbosity level to return the profile at
                  * @returns { Promise<QueryResultRow | null> } A promise containing the requested profile
@@ -460,6 +508,47 @@ export abstract class DAC {
                     return await db.queryOne(DAC.queries.users.id.get[verbosity]!, [
                         userid
                     ]);
+                },
+
+                /**
+                 * @async
+                 * @function
+                 *
+                 * Set the username (and flip username_set=TRUE) for the
+                 * authenticated user, after they have confirmed via the
+                 * username-signup flow.
+                 *
+                 * @returns `'taken' | 'updated' | null`
+                 *   - `'taken'` if some other user already has this username (case-insensitive)
+                 *   - `'updated'` on success; the row is returned via the second tuple field
+                 *   - `null` iff `DAC.enable === false`
+                 */
+                async setUsername(username: string): Promise<['taken'] | ['updated', QueryResultRow] | null> {
+                    return DAC.run<Promise<['taken'] | ['updated', QueryResultRow]>>(async () => {
+                        const client = await db.getClient();
+                        try {
+                            await client.query('BEGIN');
+                            const taken = await client.query<{ id: number }>(
+                                DAC.queries.users.usernameTakenBy,
+                                [username, userid],
+                            );
+                            if (taken.rowCount && taken.rowCount > 0) {
+                                await client.query('ROLLBACK');
+                                return ['taken'];
+                            }
+                            const result = await client.query<QueryResultRow>(
+                                DAC.queries.users.updateUsername,
+                                [userid, username],
+                            );
+                            await client.query('COMMIT');
+                            return ['updated', result.rows[0]!];
+                        } catch (err) {
+                            await client.query('ROLLBACK');
+                            throw err;
+                        } finally {
+                            client.release();
+                        }
+                    });
                 }
             }
         },
@@ -566,14 +655,24 @@ export abstract class DAC {
                                             count_games_won = count_games_won + (1 * $3),
                                             game_metrics = game_metrics || $4::jsonb,
                                             overall_metrics = overall_metrics       -- placeholder for later
-                                        WHERE id = $1;`
+                                        WHERE id = $1;`,
+
+                        playerGameMetrics: `INSERT INTO player_game_metrics
+                                                (game_id, user_id, side, points, breakdown, catalog_version, computed_at)
+                                            VALUES ($1, $2, $3, $4, $5::jsonb, $6, NOW())
+                                            ON CONFLICT (game_id, user_id) DO UPDATE SET
+                                                side             = EXCLUDED.side,
+                                                points           = EXCLUDED.points,
+                                                breakdown        = EXCLUDED.breakdown,
+                                                catalog_version  = EXCLUDED.catalog_version,
+                                                computed_at      = NOW();`
                     }
                 }
             },
             rounds: {
                 create: `INSERT INTO
-                                voting_rounds (game_id, leader_userid, mission_participent_userids, count_spies_nominated, plot_cards_stuff, vote_poll, vote_status, mission_status, mission_details, suspicions)
-                                VALUES        ($1     , $2           , $3                         , $4                   , $5              , $6       , $7         , $8            , $9             , $10)
+                                voting_rounds (game_id, leader_userid, mission_participent_userids, count_spies_nominated, plot_cards_stuff, vote_poll, vote_status, mission_status, mission_details, suspicions, mission_cards)
+                                VALUES        ($1     , $2           , $3                         , $4                   , $5              , $6       , $7         , $8            , $9             , $10       , $11::jsonb)
                             RETURNING id;`,
                 id: {
     
@@ -610,12 +709,14 @@ export abstract class DAC {
                 get: [
                     `SELECT
                         id, username, pfp, bio,
+                        username_set,
                         last_played
                     FROM public.player_profiles
                     WHERE id = $1;
                     `,
                     `SELECT
                         p.id, p.username, p.pfp, p.bio, p.friends,
+                        p.username_set,
                         p.count_games, p.count_games_won, p.game_metrics, p.overall_metrics,
                         jsonb_object_agg(e.key, e.value->'uid') AS connections,
                         p.last_played, p.creation_date
@@ -631,6 +732,24 @@ export abstract class DAC {
                     `
                 ]
             },
+
+            /**
+             * Sets the username AND flips username_set=TRUE so the frontend
+             * stops prompting. Returns the new (medium-verbosity) profile.
+             */
+            updateUsername: `UPDATE public.player_profiles
+                                SET username = $2, username_set = TRUE
+                            WHERE id = $1
+                            RETURNING id, username, pfp, bio, username_set, count_games, count_games_won;`,
+
+            /**
+             * Returns 1 row if some other player already has this username,
+             * 0 rows otherwise. Used by the username-set endpoint to enforce
+             * uniqueness without a hard SQL constraint.
+             */
+            usernameTakenBy: `SELECT id FROM public.player_profiles
+                                WHERE LOWER(username) = LOWER($1) AND id <> $2
+                                LIMIT 1;`,
 
             ids: [
                 `SELECT

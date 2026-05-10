@@ -19,18 +19,17 @@ describe('MissionsPhase Cases', () => {
     const store = useGameStore()
     store.nominatedTeam = [2, 3]
     const wrapper = mount(MissionPhase)
-    expect(wrapper.text()).toContain('Mission in Progress')
-    expect(wrapper.text()).not.toContain('Select a mission outcome')
+    expect(wrapper.text()).toContain('MISSION IN PROGRESS')
+    expect(wrapper.text()).not.toContain('SELECT MISSION OUTCOME')
   })
 
   it('renders Success and Fail buttons when I am on the team', () => {
     const wrapper = mount(MissionPhase)
-    expect(wrapper.text()).toContain('Success')
-    expect(wrapper.text()).toContain('Fail')
-    expect(wrapper.text()).toContain('Select a mission outcome')
+    expect(wrapper.text()).toContain('SUCCESS')
+    expect(wrapper.text()).toContain('FAIL')
+    expect(wrapper.text()).toContain('SELECT MISSION OUTCOME')
 
     const buttons = wrapper.findAllComponents(VBtn)
-    // Two action buttons in the v-card-text + two confirm/cancel inside the dialog.
     expect(buttons.length).toBeGreaterThanOrEqual(2)
   })
 
@@ -45,9 +44,8 @@ describe('MissionsPhase Cases', () => {
 
   it('the Success button is rendered as one of the two large outcome buttons', () => {
     const wrapper = mount(MissionPhase)
-    const visibleSuccess = wrapper.findAll('button').filter(b => b.text() === 'Success')
-    const visibleFail = wrapper.findAll('button').filter(b => b.text() === 'Fail')
-    // The component randomizes order but always shows exactly one of each.
+    const visibleSuccess = wrapper.findAll('button').filter(b => b.text() === 'SUCCESS')
+    const visibleFail = wrapper.findAll('button').filter(b => b.text() === 'FAIL')
     expect(visibleSuccess.length).toBe(1)
     expect(visibleFail.length).toBe(1)
   })

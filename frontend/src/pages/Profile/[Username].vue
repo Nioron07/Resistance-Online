@@ -1,299 +1,351 @@
 <template>
-  <v-layout>
-    <AppNav />
+  <v-container class="r-profile" max-width="1200">
+    <header class="r-profile-header">
+      <div class="d-flex align-center">
+        <v-avatar v-if="profile?.pfp" class="mr-3" size="56">
+          <v-img :src="profile.pfp" />
+        </v-avatar>
 
-    <v-main style="height: 100vh">
-      <v-container>
-        <v-row class="align-stretch" justify="center">
-          <v-col cols="12" md="4">
-            <v-card elevation="4" height="100%">
-              <v-card-title class="text-center">{{
-                route.params.Username
-              }}</v-card-title>
+        <v-avatar v-else class="mr-3" color="surface-elevated" size="56">
+          <v-icon icon="mdi-account" />
+        </v-avatar>
 
-              <v-card-text
-                class="d-flex flex-column align-center justify-center"
-                style="height: 30%"
-              >
-                <v-avatar size="150">
-                  <v-img v-if="appStore.user?.pfp" :src="appStore.user.pfp" />
-                  <v-icon v-else size="150">mdi-account-circle</v-icon>
-                </v-avatar>
-              </v-card-text>
+        <div>
+          <h1 class="r-profile-name">{{ usernameDisplay }}</h1>
 
-              <v-card-text>
-                <StatsRadarChart :stats="chartData" />
-              </v-card-text>
-            </v-card>
-          </v-col>
+          <p class="r-profile-meta">
+            <span v-if="metrics">
+              {{ metrics.counts.games }} GAMES · {{ metrics.counts.wins }}W · {{ metrics.counts.losses }}L
+            </span>
+          </p>
+        </div>
+      </div>
+    </header>
 
-          <v-col cols="12" md="8">
-            <v-card elevation="4" height="100%">
-              <v-card-title>My Stats</v-card-title>
+    <!-- Headline indices + lifetime points -->
+    <section class="r-grid-headline">
+      <MetricCard
+        :delta="null"
+        hint="(R + S) / 2"
+        label="P-INDEX"
+        :precision="2"
+        side="neutral"
+        :value="indexBundle?.pIndex ?? null"
+      />
 
-              <v-card-text
-                class="d-flex flex-column ga-3"
-                style="height: calc(100% - 52px)"
-              >
-                <!-- General -->
-                <div class="stat-section">
-                  <div class="stat-section-header text-white">GENERAL</div>
+      <MetricCard
+        hint="resistance games"
+        label="R-INDEX"
+        :precision="2"
+        side="resistance"
+        :value="indexBundle?.rIndex ?? null"
+      />
 
-                  <div class="stat-section-body">
-                    <div class="stat-row">
-                      <v-tooltip location="end" text="Cmon">
-                        <template #activator="{ props }">
-                          <span class="stat-label" style="cursor: default" v-bind="props">Games Played</span>
-                        </template>
-                      </v-tooltip>
+      <MetricCard
+        hint="spy games"
+        label="S-INDEX"
+        :precision="2"
+        side="spy"
+        :value="indexBundle?.sIndex ?? null"
+      />
 
-                      <span class="stat-value"> {{ metrics?.counts.games ?? '-' }} </span>
-                    </div>
+      <MetricCard
+        color-value-by-sign
+        :hint="lifetimeHint"
+        label="LIFETIME PTS"
+        :precision="0"
+        side="neutral"
+        :value="metrics?.lifetimePoints.total ?? null"
+      />
+    </section>
 
-                    <div class="stat-row">
-                      <v-tooltip location="end" text="how many times you locked in">
-                        <template #activator="{ props }">
-                          <span class="stat-label" style="cursor: default" v-bind="props">Wins</span>
-                        </template>
-                      </v-tooltip>
+    <!-- Resistance / Spy split -->
+    <section class="r-grid-split">
+      <v-card class="r-split-card r-card-hover side-resistance pa-5">
+        <h2 class="r-split-title">RESISTANCE</h2>
 
-                      <span class="stat-value">{{ metrics?.counts.wins ?? '-' }}</span>
-                    </div>
+        <div class="r-split-grid">
+          <MetricCard hint="rate of sherlock" label="RoS_L" :precision="3" :value="metrics?.resistance.RoS_L ?? null" />
+          <MetricCard hint="rate of CD" label="RoCD_L" :precision="3" :value="metrics?.resistance.RoCD_L ?? null" />
+          <MetricCard color-value-by-sign label="LIFETIME PTS" :precision="0" :value="metrics?.lifetimePoints.resistance ?? null" />
+          <MetricCard label="GAMES" :precision="0" :value="metrics?.counts.gamesAsResistance ?? null" />
+        </div>
+      </v-card>
 
-                    <div class="stat-row">
-                      <v-tooltip location="end" text="how many times you locked out">
-                        <template #activator="{ props }">
-                          <span class="stat-label" style="cursor: default" v-bind="props">Losses</span>
-                        </template>
-                      </v-tooltip>
+      <v-card class="r-split-card r-card-hover side-spy pa-5">
+        <h2 class="r-split-title r-split-title-spy">SPY</h2>
 
-                      <span class="stat-value">{{ metrics?.counts.losses ?? '-' }}</span>
-                    </div>
+        <div class="r-split-grid">
+          <MetricCard hint="rate of illusion" label="RoI_L" :precision="3" :value="metrics?.spy.RoI_L ?? null" />
+          <MetricCard hint="rate of infiltration" label="RoIF_L" :precision="3" :value="metrics?.spy.RoIF_L ?? null" />
+          <MetricCard color-value-by-sign label="LIFETIME PTS" :precision="0" :value="metrics?.lifetimePoints.spy ?? null" />
+          <MetricCard label="GAMES" :precision="0" :value="metrics?.counts.gamesAsSpy ?? null" />
+        </div>
+      </v-card>
+    </section>
 
-                    <div class="stat-row">
-                      <v-tooltip location="end" text="u threw">
-                        <template #activator="{ props }">
-                          <span class="stat-label" style="cursor: default" v-bind="props">Throws</span>
-                        </template>
-                      </v-tooltip>
+    <!-- Game log -->
+    <section class="r-game-log">
+      <header class="r-game-log-header">
+        <h2 class="r-section-title">GAME LOG</h2>
+        <span v-if="gameLog" class="r-section-meta">{{ gameLog.total }} GAMES</span>
+      </header>
 
-                      <span class="stat-value">—</span>
-                    </div>
-                  </div>
-                </div>
+      <SideTable
+        :columns="logColumns"
+        empty-text="No completed games yet."
+        :rows="gameLog?.rows ?? []"
+        @row-click="(r) => router.push(`/Game/${r.gameid}/EndState`)"
+      >
+        <template #cell.endTimestamp="{ row }">
+          <span class="text-medium-emphasis">{{ formatDate(row.endTimestamp) }}</span>
+        </template>
 
-                <!-- Resistance -->
-                <div class="stat-section stat-section--blue">
-                  <div class="stat-section-header">RESISTANCE</div>
+        <template #cell.gameid="{ row }">#{{ row.gameid }}</template>
 
-                  <div class="stat-section-body">
-                    <div class="stat-row">
-                      <v-tooltip location="end" text="Lifetime Rate of CD: Fraction of Spies this player has put onto their proposed teams as a Resistance Leader">
-                        <template #activator="{ props }">
-                          <span class="stat-label" style="cursor: default" v-bind="props">ROCD</span>
-                        </template>
-                      </v-tooltip>
+        <template #cell.side="{ row }">
+          <PlayerRoleTag :role="row.role" side-only />
+        </template>
 
-                      <span class="stat-value">{{ pct(metrics?.resistance.RoCD_L) }}</span>
-                    </div>
+        <template #cell.points="{ row }">
+          <span class="tabular-nums" :class="row.points > 0 ? 'text-success' : row.points < 0 ? 'text-error' : ''">
+            {{ row.points > 0 ? '+' : '' }}{{ row.points }}
+          </span>
+        </template>
 
-                    <div class="stat-row">
-                      <v-tooltip location="end" text="Games as Resistance">
-                        <template #activator="{ props }">
-                          <span class="stat-label" style="cursor: default" v-bind="props">Games Played</span>
-                        </template>
-                      </v-tooltip>
+        <template #cell.won="{ row }">
+          <span :class="row.won ? 'text-success' : 'text-error'">
+            {{ row.won === null ? '—' : row.won ? 'WIN' : 'LOSS' }}
+          </span>
+        </template>
 
-                      <span class="stat-value">{{ metrics?.counts.gamesAsResistance ?? '-' }}</span>
-                    </div>
+        <template #cell.missions="{ row }">
+          <MissionTracker dense :outcomes="row.missionStatuses" />
+        </template>
+      </SideTable>
 
-                    <div class="stat-row">
-                      <v-tooltip location="end" text="Resistance for the win">
-                        <template #activator="{ props }">
-                          <span class="stat-label" style="cursor: default" v-bind="props">Games Won</span>
-                        </template>
-                      </v-tooltip>
+      <div class="r-game-log-footer">
+        <v-btn
+          v-if="hasMore"
+          :loading="loadingMore"
+          variant="text"
+          @click="loadMore"
+        >
+          LOAD MORE
+        </v-btn>
+      </div>
+    </section>
 
-                      <span class="stat-value">—</span>
-                    </div>
-
-                    <div class="stat-row">
-                      <v-tooltip location="end" text="Lifetime Rate of Sherlock: Measures how good this player is at sussing out spies over thier lifetime">
-                        <template #activator="{ props }">
-                          <span class="stat-label" style="cursor: default" v-bind="props">ROS</span>
-                        </template>
-                      </v-tooltip>
-
-                      <span class="stat-value">{{ pct(metrics?.resistance.RoS_L) }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Spy -->
-                <div class="stat-section stat-section--red">
-                  <div class="stat-section-header">SPY</div>
-
-                  <div class="stat-section-body">
-                    <div class="stat-row">
-                      <v-tooltip location="end" text="Rate of Illusion: How well a Spy flies under the radar">
-                        <template #activator="{ props }">
-                          <span class="stat-label" style="cursor: default" v-bind="props">ROI</span>
-                        </template>
-                      </v-tooltip>
-
-                      <span class="stat-value">{{ pct(metrics?.spy.RoI_L) }}</span>
-                    </div>
-
-                    <div class="stat-row">
-                      <v-tooltip location="end" text="Games as Spy">
-                        <template #activator="{ props }">
-                          <span class="stat-label" style="cursor: default" v-bind="props">Games Played</span>
-                        </template>
-                      </v-tooltip>
-
-                      <span class="stat-value">{{ metrics?.counts.gamesAsSpy ?? '-' }}</span>
-                    </div>
-
-                    <div class="stat-row">
-                      <v-tooltip location="end" text="Spy win">
-                        <template #activator="{ props }">
-                          <span class="stat-label" style="cursor: default" v-bind="props">Games Won</span>
-                        </template>
-                      </v-tooltip>
-
-                      <span class="stat-value">—</span>
-                    </div>
-
-                    <div class="stat-row">
-                      <v-tooltip location="end" text="Rate of Infiltration: Proportion of times that you were proposed on a team as a spy, that lead to you going on that mission">
-                        <template #activator="{ props }">
-                          <span class="stat-label" style="cursor: default" v-bind="props">ROIF</span>
-                        </template>
-                      </v-tooltip>
-
-                      <span class="stat-value">{{ pct(metrics?.spy.RoIF_L) }}</span>
-                    </div>
-                  </div>
-                </div>
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-      </v-container>
-    </v-main>
-  </v-layout>
+    <div v-if="error" class="r-error">{{ error }}</div>
+  </v-container>
 </template>
 
 <script setup lang="ts">
-  import { computed, onMounted, ref } from 'vue'
-  import AppNav from '@/components/AppNav.vue'
-  import StatsRadarChart from '@/components/StatsRadarChart.vue'
+  import { computed, onMounted, ref, watch } from 'vue'
+  import { useRoute, useRouter } from 'vue-router'
+  import MetricCard from '@/components/MetricCard.vue'
+  import MissionTracker from '@/components/MissionTracker.vue'
+  import PlayerRoleTag from '@/components/PlayerRoleTag.vue'
+  import SideTable from '@/components/SideTable.vue'
+  import {
+    fetchUserGames,
+    fetchUserIndex,
+    fetchUserMetrics,
+    type UserGameLog,
+    type UserIndex,
+    type UserMetrics,
+  } from '@/services/api'
   import { useAppStore } from '@/stores/app'
 
-  const route = useRoute('/Profile/[Username]')
+  const route = useRoute()
+  const router = useRouter()
   const appStore = useAppStore()
-  const metrics = ref(null)
 
-  onMounted(async () => {
-    const res = await fetch(`/api/users/${appStore.user?.id}/metrics`, {
-      credentials: 'include',
-    })
-    if (res.ok) {
-      metrics.value = await res.json()
-    }
+  const usernameRaw = computed(() => {
+    const v = route.params.Username ?? route.params.username
+    return Array.isArray(v) ? v[0] : v ?? ''
   })
 
-  // Round a [0..1] (or [-1..1]) ratio to an integer percentage for display.
-  function pct (v: number | null | undefined): string {
-    if (v == null) return '-'
-    return `${Math.round(v * 100)}%`
-  }
+  const userid = ref<number | null>(null)
+  const profile = ref<{ pfp: string | null } | null>(null)
+  const metrics = ref<UserMetrics | null>(null)
+  const indexBundle = ref<UserIndex | null>(null)
+  const gameLog = ref<UserGameLog | null>(null)
 
-  // Same conversion, returned as a clamped 0-100 number for the radar chart so
-  // the chart axis matches the printed stat values.
-  function pctNum (v: number | null | undefined): number {
-    if (v == null) return 0
-    return Math.max(0, Math.min(100, Math.round(v * 100)))
-  }
+  const loadingMore = ref(false)
+  const error = ref('')
 
-  const chartData = computed(() => {
-    const r = metrics.value?.resistance
-    const s = metrics.value?.spy
-    const c = metrics.value?.counts
-    return {
-      Leadership: pctNum(r?.RoCD_L),
-      Deception: pctNum(s?.RoI_L),
-      Detection: pctNum(r?.RoS_L),
-      Consistency: c?.games != null && c?.wins != null && c.games > 0
-        ? Math.round((c.wins / c.games) * 100)
-        : 0,
-      Trust: 0,
-    }
+  const usernameDisplay = computed(() => usernameRaw.value || 'Unknown player')
+  const lifetimeHint = computed(() => {
+    if (!metrics.value) return ''
+    return `R ${metrics.value.lifetimePoints.resistance} · S ${metrics.value.lifetimePoints.spy}`
   })
+
+  const logColumns = [
+    { key: 'endTimestamp', label: 'PLAYED', align: 'left' as const, width: '180px' },
+    { key: 'gameid', label: 'GAME', align: 'left' as const, width: '90px' },
+    { key: 'side', label: 'SIDE', align: 'left' as const, width: '120px' },
+    { key: 'points', label: 'POINTS', align: 'right' as const, width: '90px' },
+    { key: 'won', label: 'RESULT', align: 'left' as const, width: '90px' },
+    { key: 'missions', label: 'MISSIONS', align: 'left' as const },
+  ]
+
+  const hasMore = computed(() => {
+    if (!gameLog.value) return false
+    return gameLog.value.rows.length < gameLog.value.total
+  })
+
+  function formatDate (s: string): string {
+    try {
+      return new Date(s).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
+    } catch {
+      return s
+    }
+  }
+
+  /**
+   * Resolve the route's username → userid.
+   * Strategy:
+   *   1. If it matches the logged-in user, use appStore.user.id.
+   *   2. Otherwise, fall back to /api/users (verbosity=0) and find by username.
+   */
+  async function resolveUserid (username: string): Promise<number | null> {
+    await appStore.fetchUser()
+    if (appStore.user?.username === username && appStore.user?.id != null) {
+      return appStore.user.id
+    }
+    try {
+      const res = await fetch('/api/users?verbosity=0', { credentials: 'include' })
+      if (!res.ok) return null
+      const arr = (await res.json()) as Array<{ id: number, username: string, pfp: string | null }>
+      const match = arr.find(u => u.username === username)
+      if (match) {
+        profile.value = { pfp: match.pfp }
+        return match.id
+      }
+    } catch { /* fall through */ }
+    return null
+  }
+
+  async function loadAll (id: number) {
+    error.value = ''
+    try {
+      const [m, idx, log] = await Promise.all([
+        fetchUserMetrics(id),
+        fetchUserIndex(id),
+        fetchUserGames(id, 50, 0),
+      ])
+      metrics.value = m
+      indexBundle.value = idx
+      gameLog.value = log
+    } catch (error_) {
+      error.value = (error_ as Error).message
+    }
+  }
+
+  async function loadMore () {
+    if (!gameLog.value || !userid.value) return
+    loadingMore.value = true
+    try {
+      const next = await fetchUserGames(userid.value, 50, gameLog.value.rows.length)
+      gameLog.value = {
+        ...next,
+        rows: [...gameLog.value.rows, ...next.rows],
+      }
+    } catch (error_) {
+      error.value = (error_ as Error).message
+    } finally {
+      loadingMore.value = false
+    }
+  }
+
+  async function init () {
+    const id = await resolveUserid(usernameRaw.value)
+    if (id === null) {
+      error.value = `No player found for "${usernameRaw.value}"`
+      return
+    }
+    userid.value = id
+    if (appStore.user?.id === id) {
+      profile.value = { pfp: appStore.user?.pfp ?? null }
+    }
+    await loadAll(id)
+  }
+
+  watch(() => usernameRaw.value, init)
+  onMounted(init)
 </script>
 
 <style scoped>
-.stat-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  overflow: hidden;
+.r-profile { padding-top: 24px; padding-bottom: 48px; }
+.r-profile-header { margin-bottom: 24px; }
+.r-profile-name {
+  font-size: 1.75rem;
+  font-weight: 300;
+  letter-spacing: 0.04em;
+  margin: 0;
 }
-
-.stat-section-header {
-  padding: 6px 14px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.08);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.stat-section--blue .stat-section-header {
-  color: #90caf9;
-  background: rgba(33, 150, 243, 0.12);
-  border-bottom-color: rgba(33, 150, 243, 0.2);
-}
-
-.stat-section--blue {
-  border-color: rgba(33, 150, 243, 0.25);
-}
-
-.stat-section--red .stat-section-header {
-  color: #ef9a9a;
-  background: rgba(244, 67, 54, 0.12);
-  border-bottom-color: rgba(244, 67, 54, 0.2);
-}
-
-.stat-section--red {
-  border-color: rgba(244, 67, 54, 0.25);
-}
-
-.stat-section-body {
-  flex: 1;
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.stat-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.stat-label {
+.r-profile-meta {
+  margin: 0;
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgb(var(--v-theme-on-surface-muted));
+  letter-spacing: 0.06em;
 }
 
-.stat-value {
+.r-grid-headline {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+@media (max-width: 960px) { .r-grid-headline { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .r-grid-headline { grid-template-columns: 1fr; } }
+
+.r-grid-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+@media (max-width: 960px) { .r-grid-split { grid-template-columns: 1fr; } }
+.r-split-card {
+  background-color: rgb(var(--v-theme-surface)) !important;
+  border: 1px solid rgb(var(--v-theme-border)) !important;
+}
+.r-split-title {
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  color: var(--r-resistance);
+  margin: 0 0 16px;
+  font-weight: 500;
+}
+.r-split-title-spy { color: var(--r-spy); }
+.r-split-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 480px) { .r-split-grid { grid-template-columns: 1fr; } }
+
+.r-game-log-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.r-section-title {
   font-size: 0.85rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.12em;
+  color: rgb(var(--v-theme-on-surface-muted));
+  margin: 0;
+  font-weight: 500;
+}
+.r-section-meta { font-size: 0.7rem; letter-spacing: 0.08em; color: rgb(var(--v-theme-on-surface-muted)); }
+.r-game-log-footer { display: flex; justify-content: center; padding: 12px; }
+.r-error {
+  margin-top: 16px;
+  text-align: center;
+  color: var(--r-spy);
+  font-size: 0.875rem;
 }
 </style>

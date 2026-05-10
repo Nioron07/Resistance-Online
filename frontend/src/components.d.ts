@@ -13,10 +13,18 @@ declare module 'vue' {
   export interface GlobalComponents {
     AppFooter: typeof import('./components/AppFooter.vue')['default']
     AppNav: typeof import('./components/AppNav.vue')['default']
+    BreakdownPanel: typeof import('./components/BreakdownPanel.vue')['default']
+    GameOutcomeChip: typeof import('./components/GameOutcomeChip.vue')['default']
     HelloWorld: typeof import('./components/HelloWorld.vue')['default']
+    IndexBadge: typeof import('./components/IndexBadge.vue')['default']
+    MetricCard: typeof import('./components/MetricCard.vue')['default']
+    MissionTracker: typeof import('./components/MissionTracker.vue')['default']
     PlayerCard: typeof import('./components/PlayerCard.vue')['default']
+    PlayerCell: typeof import('./components/PlayerCell.vue')['default']
+    PlayerRoleTag: typeof import('./components/PlayerRoleTag.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SideTable: typeof import('./components/SideTable.vue')['default']
     StatsRadarChart: typeof import('./components/StatsRadarChart.vue')['default']
   }
 }

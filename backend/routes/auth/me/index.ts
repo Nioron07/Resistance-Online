@@ -17,12 +17,13 @@ const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: FastifyRepl
     }
 
     try {
-        if (!(req.query.verbosity in ["i", "love", "javascript syntax!!!!"])) {
+        const verbosity = Number(req.query.verbosity ?? 0) as ProfileVerbosity;
+        if (!Number.isInteger(verbosity) || verbosity < 0 || verbosity > 2) {
             rep.code(400).send(`Query parameter 'verbosity' must be 0, 1, or 2`);
             return;
         }
 
-        const profile = await DAC.users.id((req.user as { userid: number }).userid).get(1);
+        const profile = await DAC.users.id((req.user as { userid: number }).userid).get(verbosity);
 
         rep.code(200).send(profile);
     } catch{

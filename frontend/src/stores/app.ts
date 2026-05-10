@@ -16,6 +16,12 @@ interface UserProfile {
   connections: unknown
   last_played: string
   creation_date: string
+  /**
+   * False on first SSO login — prompts the user to confirm or change
+   * the Steam display name on the username-signup page. Flipped to
+   * true once they POST /auth/me/username.
+   */
+  username_set: boolean
 }
 
 export const useAppStore = defineStore('app', () => {
@@ -52,5 +58,29 @@ export const useAppStore = defineStore('app', () => {
     window.location.href = `${API_BASE}/auth/login/steam`
   }
 
-  return { user, loading, isAuthenticated, fetchUser, logout, loginWithSteam }
+  /**
+   * POST /auth/me/username — flips username_set=TRUE in the DB and updates
+   * the local user. Returns null on success, or an error message string.
+   */
+  async function setUsername (username: string): Promise<string | null> {
+    try {
+      const res = await fetch(`${API_BASE}/auth/me/username`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({} as { error?: string }))
+        return body.error ?? `HTTP ${res.status}`
+      }
+      // Refresh the local profile so isAuthenticated and username_set are current.
+      await fetchUser()
+      return null
+    } catch (error) {
+      return (error as Error).message
+    }
+  }
+
+  return { user, loading, isAuthenticated, fetchUser, logout, loginWithSteam, setUsername }
 })

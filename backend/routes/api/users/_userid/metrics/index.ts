@@ -21,6 +21,19 @@ export interface MetricsRow {
     players: Record<string, string | null>;
     resistance_win: boolean | null;
     round_index_in_game: number;
+    /**
+     * Per-player card vote on the mission that this nomination ran. `null`
+     * when the vote was rejected (no mission was played) or for legacy rows
+     * recorded before the column existed.
+     * Read by the points/index pipeline; the lifetime metrics endpoint
+     * ignores this field.
+     */
+    mission_cards?: Record<string, 'success' | 'fail'> | null;
+    /**
+     * Per-player approve/reject vote for this nomination. The lifetime
+     * metrics endpoint doesn't read this; the points pipeline does.
+     */
+    vote_poll?: Record<string, boolean> | null;
 }
 
 /**
@@ -56,7 +69,7 @@ const metricsQuery = `
 
 
 
-const SPY_ROLES = new Set(['spy', 'assassin', 'false-commander', 'deep-cover', 'blind-spy']);
+export const SPY_ROLES: ReadonlySet<string> = new Set(['spy', 'assassin', 'false-commander', 'deep-cover', 'blind-spy']);
 
 /**
  * Returns the number of spies in a game given the players JSONB object.
@@ -79,6 +92,14 @@ interface ComplexMetrics {
         gamesAsResistance: number;
         /** Number of finished games this player played as Spy. */
         gamesAsSpy: number;
+    };
+    lifetimePoints: {
+        /** Sum of player_game_metrics.points for resistance games. */
+        resistance: number;
+        /** Sum of player_game_metrics.points for spy games. */
+        spy: number;
+        /** Combined sum of resistance + spy. */
+        total: number;
     };
     resistance: {
         /**
@@ -112,7 +133,11 @@ interface ComplexMetrics {
     };
 }
 
-export function computeMetrics(userid: string, rounds: MetricsRow[]): ComplexMetrics {
+export function computeMetrics(
+    userid: string,
+    rounds: MetricsRow[],
+    lifetimePoints: { resistance: number; spy: number } = { resistance: 0, spy: 0 },
+): ComplexMetrics {
     let totalGames = 0;
     let totalWins = 0;
     let totalGamesAsSpy = 0;
@@ -257,6 +282,11 @@ export function computeMetrics(userid: string, rounds: MetricsRow[]): ComplexMet
             gamesAsResistance: totalGamesAsResistance,
             gamesAsSpy: totalGamesAsSpy,
         },
+        lifetimePoints: {
+            resistance: lifetimePoints.resistance,
+            spy: lifetimePoints.spy,
+            total: lifetimePoints.resistance + lifetimePoints.spy,
+        },
         resistance: {
             RoS_L: RoS_game_count > 0 ? RoS_G_sum / RoS_game_count : null,
             RoCD_L: RoCD_denominator > 0 ? RoCD_numerator / RoCD_denominator : null,
@@ -269,13 +299,29 @@ export function computeMetrics(userid: string, rounds: MetricsRow[]): ComplexMet
 }
 
 
+const lifetimePointsQuery = `
+    SELECT side, COALESCE(SUM(points), 0)::int AS total
+    FROM player_game_metrics
+    WHERE user_id = $1
+    GROUP BY side;
+`;
+
 export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: FastifyReply) => {
     try {
         const userid = req.params.userid;
 
-        const rounds = await queryAll<MetricsRow>(metricsQuery, [userid.toString()]);
+        const [rounds, points] = await Promise.all([
+            queryAll<MetricsRow>(metricsQuery, [userid.toString()]),
+            queryAll<{ side: 'resistance' | 'spy'; total: number }>(lifetimePointsQuery, [userid]),
+        ]);
 
-        const metrics = computeMetrics(userid.toString(), rounds);
+        const lifetimePoints = { resistance: 0, spy: 0 };
+        for (const row of points) {
+            if (row.side === 'resistance') lifetimePoints.resistance = Number(row.total);
+            else if (row.side === 'spy')   lifetimePoints.spy        = Number(row.total);
+        }
+
+        const metrics = computeMetrics(userid.toString(), rounds, lifetimePoints);
 
         rep.code(200).send(metrics);
     } catch (error) {
@@ -311,6 +357,14 @@ export const get_opts = {
                             losses:            {type: 'number', description: 'Total finished games lost'},
                             gamesAsResistance: {type: 'number', description: 'Finished games played as Resistance'},
                             gamesAsSpy:        {type: 'number', description: 'Finished games played as Spy'},
+                        }
+                    },
+                    lifetimePoints: {
+                        type: 'object',
+                        properties: {
+                            resistance: {type: 'number', description: 'Sum of game points earned as Resistance'},
+                            spy:        {type: 'number', description: 'Sum of game points earned as Spy'},
+                            total:      {type: 'number', description: 'Combined lifetime points'},
                         }
                     },
                     resistance: {

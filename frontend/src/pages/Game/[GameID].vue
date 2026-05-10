@@ -1,24 +1,23 @@
 <template>
-  <v-app-bar elevation="0">
-    <!-- Left: Game info (desktop only) -->
+  <v-app-bar class="r-game-bar" elevation="0" flat>
     <template #prepend>
       <div v-if="!smAndDown" class="d-flex align-center ga-3 ml-2">
-        <v-app-bar-title class="mr-4">Game Code: {{ $route.params.GameID }}</v-app-bar-title>
+        <span class="r-game-code">CODE · <span class="tabular-nums">{{ $route.params.GameID }}</span></span>
 
-        <v-chip label size="small">
-          <v-icon icon="mdi-account-group" start />
-          {{ game.playerCount }} Players
-        </v-chip>
+        <span class="r-stat tabular-nums">
+          <v-icon icon="mdi-account-group" size="small" />
+          {{ game.playerCount }}
+        </span>
 
-        <v-chip color="blue" label size="small">
-          <v-icon icon="mdi-shield" start />
-          {{ game.numResistance }} Resistance
-        </v-chip>
+        <span class="r-stat r-stat-resistance tabular-nums">
+          <v-icon icon="mdi-shield" size="small" />
+          {{ game.numResistance }}
+        </span>
 
-        <v-chip color="red" label size="small">
-          <v-icon icon="mdi-eye" start />
-          {{ game.numSpies }} Spies
-        </v-chip>
+        <span class="r-stat r-stat-spy tabular-nums">
+          <v-icon icon="mdi-eye" size="small" />
+          {{ game.numSpies }}
+        </span>
       </div>
 
       <v-btn
@@ -30,85 +29,69 @@
       />
     </template>
 
-    <!-- Center: Mission tracker -->
-    <div class="d-flex justify-center align-center w-100" :class="smAndDown ? 'ga-1' : 'ga-2'" :style="smAndDown ? '' : 'position: absolute; left: 50%; transform: translateX(-50%);'">
-      <v-avatar v-for="(size, mission) in game.teamSizes" :key="mission" :color="game.missionOutcomes[Number(mission) - 1]" :size="smAndDown ? 28 : 36">
-        <span class="text-white" :class="smAndDown ? 'text-caption' : 'text-body-2'">{{ size }}</span>
-      </v-avatar>
+    <div class="r-tracker-container">
+      <MissionTracker :dense="smAndDown" :outcomes="missionOutcomesAsBool" />
     </div>
 
-    <!-- Right: Current phase (desktop only) -->
     <template #append>
-      <v-chip v-if="!smAndDown" class="mr-2" color="primary" label>
-        <v-icon icon="mdi-vote" start />
-        {{ game.phaseLabel }}
-      </v-chip>
-
-      <v-btn
-        v-else
-        icon
-        size="small"
-        style="visibility: hidden;"
-        variant="text"
-      />
+      <span v-if="!smAndDown" class="r-phase">
+        {{ game.phaseLabel?.toUpperCase() }}
+      </span>
     </template>
   </v-app-bar>
 
-  <!-- Mobile info dialog -->
   <v-dialog v-model="infoDialog" max-width="350">
-    <v-card>
-      <v-card-title class="text-center">Game Info</v-card-title>
+    <v-card class="pa-4">
+      <h3 class="r-dialog-title">GAME INFO</h3>
 
-      <v-card-text class="d-flex flex-column align-center ga-3">
-        <v-chip label>
-          <v-icon icon="mdi-pound" start />
-          Game Code: {{ $route.params.GameID }}
-        </v-chip>
+      <div class="r-dialog-grid">
+        <div><span class="r-dialog-label">CODE</span><span class="tabular-nums">{{ $route.params.GameID }}</span></div>
+        <div><span class="r-dialog-label">PLAYERS</span><span class="tabular-nums">{{ game.playerCount }}</span></div>
+        <div><span class="r-dialog-label r-stat-resistance">RESISTANCE</span><span class="tabular-nums">{{ game.numResistance }}</span></div>
+        <div><span class="r-dialog-label r-stat-spy">SPIES</span><span class="tabular-nums">{{ game.numSpies }}</span></div>
+        <div class="r-dialog-row-wide"><span class="r-dialog-label">PHASE</span><span>{{ game.phaseLabel?.toUpperCase() }}</span></div>
+      </div>
 
-        <v-chip label>
-          <v-icon icon="mdi-account-group" start />
-          {{ game.playerCount }} Players
-        </v-chip>
-
-        <v-chip color="blue" label>
-          <v-icon icon="mdi-shield" start />
-          {{ game.numResistance }} Resistance
-        </v-chip>
-
-        <v-chip color="red" label>
-          <v-icon icon="mdi-eye" start />
-          {{ game.numSpies }} Spies
-        </v-chip>
-
-        <v-chip color="primary" label>
-          <v-icon icon="mdi-vote" start />
-          Phase: {{ game.phaseLabel }}
-        </v-chip>
-      </v-card-text>
-
-      <v-card-actions class="justify-center">
-        <v-btn variant="tonal" @click="infoDialog = false">Close</v-btn>
-      </v-card-actions>
+      <v-btn block class="mt-4" variant="tonal" @click="infoDialog = false">CLOSE</v-btn>
     </v-card>
   </v-dialog>
 
   <v-main style="--v-layout-top: 0px;">
-    <v-img cover :src="game.backgroundImage" style="height: calc(100vh - 64px);">
-      <router-view />
-    </v-img>
+    <div class="r-game-stage">
+      <v-img class="r-game-bg" cover :src="game.backgroundImage">
+        <div class="r-game-overlay" />
+      </v-img>
+
+      <div class="r-game-content">
+        <router-view />
+      </div>
+    </div>
   </v-main>
 </template>
 
 <script setup lang="ts">
-  import { onMounted, onUnmounted, ref } from 'vue'
+  import { computed, onMounted, onUnmounted, ref } from 'vue'
   import { useRoute } from 'vue-router'
   import { useDisplay } from 'vuetify'
+  import MissionTracker from '@/components/MissionTracker.vue'
   import { useGameStore } from '@/stores/game'
 
   const { smAndDown } = useDisplay()
   const infoDialog = ref(false)
   const game = useGameStore()
   const route = useRoute()
+
+  /**
+   * Translate the store's `'transparent' | 'blue' | 'red'` outcome strings
+   * into MissionTracker's boolean / null format.
+   */
+  const missionOutcomesAsBool = computed(() => {
+    return game.missionOutcomes.map(o => {
+      if (o === 'blue') return true
+      if (o === 'red') return false
+      return null
+    })
+  })
 
   onMounted(() => {
     const code = String(route.params.GameID ?? '')
@@ -119,3 +102,80 @@
     game.disconnect()
   })
 </script>
+
+<style scoped>
+.r-game-bar {
+  background-color: rgba(10, 14, 20, 0.7) !important;
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgb(var(--v-theme-border));
+}
+.r-game-code {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: rgb(var(--v-theme-on-surface-muted));
+}
+.r-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: rgb(var(--v-theme-on-surface));
+}
+.r-stat-resistance { color: var(--r-resistance); }
+.r-stat-spy        { color: var(--r-spy); }
+.r-tracker-container {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.r-phase {
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  margin-right: 12px;
+  color: var(--r-resistance);
+}
+
+.r-dialog-title {
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  margin: 0 0 12px;
+  color: rgb(var(--v-theme-on-surface-muted));
+  text-align: center;
+}
+.r-dialog-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+}
+.r-dialog-grid > div {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+.r-dialog-row-wide { grid-column: 1 / -1; }
+.r-dialog-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  color: rgb(var(--v-theme-on-surface-muted));
+}
+
+.r-game-stage {
+  position: relative;
+  height: calc(100vh - 64px);
+}
+.r-game-bg {
+  position: absolute;
+  inset: 0;
+}
+.r-game-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10,14,20,0.65) 0%, rgba(10,14,20,0.85) 100%);
+}
+.r-game-content {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  overflow-y: auto;
+}
+</style>

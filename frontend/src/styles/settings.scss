@@ -1,10 +1,58 @@
 /**
- * src/styles/settings.scss
- *
- * Configures SASS variables and Vuetify overwrites
+ * src/styles/settings.scss — global typography + design-token CSS variables.
+ * The Vuetify theme in plugins/vuetify.ts also exposes these via rgb(var(--v-theme-*));
+ * we re-export a friendlier set for plain CSS overrides.
  */
 
-// https://vuetifyjs.com/features/sass-variables/`
-// @use 'vuetify/settings' with (
-//   $color-pack: false
-// );
+/* JetBrains Mono — imported in main.ts (CSS via @fontsource/jetbrains-mono) */
+
+:root {
+  --r-bg:         #0a0e14;
+  --r-surface:    #131720;
+  --r-elevated:   #1a1f2b;
+  --r-border:     #1f2937;
+  --r-text:       #cbd5e1;
+  --r-text-muted: #64748b;
+  --r-resistance: #3b82f6;
+  --r-spy:        #ef4444;
+  --r-success:    #10b981;
+  --r-warning:    #f59e0b;
+  --r-info:       #38bdf8;
+
+  --r-mono: "JetBrains Mono", "JetBrains Mono Variable", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+
+html, body, #app {
+  background-color: var(--r-bg);
+  color: var(--r-text);
+  font-family: var(--r-mono);
+  font-feature-settings: "ss01", "calt";
+  font-variant-ligatures: contextual;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tabular figures for any numeric column */
+.tabular-nums { font-variant-numeric: tabular-nums; }
+
+/* Subtle accent strip used on cards / table rows that belong to a side */
+.side-resistance { border-left: 2px solid var(--r-resistance); }
+.side-spy        { border-left: 2px solid var(--r-spy); }
+
+/* Smooth elevation hover for interactive cards */
+.r-card-hover {
+  transition: transform 200ms ease-out, border-color 200ms ease-out;
+}
+.r-card-hover:hover {
+  transform: translateY(-1px);
+  border-color: rgba(203, 213, 225, 0.18);
+}
+
+/* Tighter Vuetify card title weight for the modern mono look */
+.v-card-title {
+  font-weight: 400 !important;
+  letter-spacing: 0.015em;
+}
+
+/* Less aggressive default spacing on body text */
+.v-card-text { line-height: 1.55; }

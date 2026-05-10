@@ -1,52 +1,109 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import type * as Api from '@/services/api'
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import EndState from '@/pages/Game/[GameID]/EndState.vue'
-import { useGameStore } from '@/stores/game'
-import { seedGameStore } from './helpers'
+import * as api from '@/services/api'
 
-describe('EndState Cases', () => {
-  it('shows "Spies Win" when winner is "spies"', () => {
-    seedGameStore({ winner: 'spies' })
-    const wrapper = mount(EndState)
-    expect(wrapper.text()).toContain('Spies Win')
-    expect(wrapper.text()).not.toContain('Resistance Wins')
-  })
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ params: { GameID: '42' } }),
+  useRouter: () => ({ push: vi.fn() }),
+}))
 
-  it('shows "Resistance Wins" when winner is "resistance"', () => {
-    seedGameStore({ winner: 'resistance' })
-    const wrapper = mount(EndState)
-    expect(wrapper.text()).toContain('Resistance Wins')
-    expect(wrapper.text()).not.toContain('Spies Win')
-  })
-
-  it('falls back to a generic "Game Over" headline when winner is null', () => {
-    seedGameStore({ winner: null })
-    const wrapper = mount(EndState)
-    expect(wrapper.text()).toContain('Game Over')
-  })
-
-  it('renders a Return Home action', () => {
-    seedGameStore({ winner: 'spies' })
-    const wrapper = mount(EndState)
-    expect(wrapper.text()).toContain('Return Home')
-  })
-
-  it('the headline reflects winner changes reactively', async () => {
-    const store = seedGameStore({ winner: 'spies' })
-    const wrapper = mount(EndState)
-    expect(wrapper.text()).toContain('Spies Win')
-
-    store.winner = 'resistance'
-    await wrapper.vm.$nextTick()
-    expect(wrapper.text()).toContain('Resistance Wins')
-  })
+vi.mock('@/services/api', async orig => {
+  const real = await orig<typeof Api>()
+  return { ...real, fetchGameMetrics: vi.fn() }
 })
 
-// Sanity: the store directly exposes `winner`.
-describe('EndState — store integration', () => {
-  it('reads winner from the game store', () => {
-    seedGameStore({ winner: 'resistance' })
-    const game = useGameStore()
-    expect(game.winner).toBe('resistance')
+function makePayload (winner: 'resistance' | 'spies' | null): api.GameMetrics {
+  return {
+    gameid: 42,
+    endTimestamp: '2026-05-06T12:00:00Z',
+    outcome: {
+      winner,
+      outcomeType: 'mission-victory',
+      missionStatuses: [true, false, true, true, true],
+      countFailedVotes: 1,
+    },
+    teams: {
+      resistance: {
+        totalPoints: 16,
+        players: [
+          {
+            userid: 1, username: 'one', pfp: null, role: 'resistance', side: 'resistance',
+            points: 8, breakdown: { approve_clean_team: 1, game_won: 5 },
+            catalogVersion: '2',
+            complexMetric: { key: 'RoS_G', value: 0.5 },
+            indexBefore: { rIndex: 4, sIndex: null, pIndex: 4 },
+            indexAfter: { rIndex: 6, sIndex: null, pIndex: 6 },
+            indexDelta: { rIndex: 2, sIndex: null, pIndex: 2 },
+          },
+        ],
+      },
+      spy: {
+        totalPoints: -11,
+        players: [
+          {
+            userid: 4, username: 'four', pfp: null, role: 'spy', side: 'spy',
+            points: -5, breakdown: { reject_dirty_team: -3, game_lost: -5 },
+            catalogVersion: '2',
+            complexMetric: { key: 'RoI_G', value: 0.3 },
+            indexBefore: { rIndex: null, sIndex: 2, pIndex: 2 },
+            indexAfter: { rIndex: null, sIndex: 0, pIndex: 0 },
+            indexDelta: { rIndex: null, sIndex: -2, pIndex: -2 },
+          },
+        ],
+      },
+    },
+    details: {
+      weighting: { strategy: 'expdecay', alpha: 0.95 },
+      catalogVersion: '2',
+    },
+  }
+}
+
+describe('EndState page', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('renders the resistance-win headline + reason', async () => {
+    vi.mocked(api.fetchGameMetrics).mockResolvedValueOnce(makePayload('resistance'))
+    const wrapper = mount(EndState)
+    await flushPromises()
+    expect(wrapper.text()).toContain('RESISTANCE WINS')
+    expect(wrapper.text()).toContain('MISSION VICTORY')
+  })
+
+  it('renders the spies-win headline', async () => {
+    vi.mocked(api.fetchGameMetrics).mockResolvedValueOnce(makePayload('spies'))
+    const wrapper = mount(EndState)
+    await flushPromises()
+    expect(wrapper.text()).toContain('SPIES WIN')
+  })
+
+  it('renders a row per player on each side with correct totals', async () => {
+    vi.mocked(api.fetchGameMetrics).mockResolvedValueOnce(makePayload('resistance'))
+    const wrapper = mount(EndState)
+    await flushPromises()
+    // Username + role appear in each table
+    expect(wrapper.text()).toContain('one')
+    expect(wrapper.text()).toContain('four')
+    // Team totals visible
+    expect(wrapper.text()).toContain('R · 16')
+    expect(wrapper.text()).toContain('S · -11')
+  })
+
+  it('shows the catalog badge', async () => {
+    vi.mocked(api.fetchGameMetrics).mockResolvedValueOnce(makePayload('resistance'))
+    const wrapper = mount(EndState)
+    await flushPromises()
+    expect(wrapper.text()).toContain('CATALOG v2')
+  })
+
+  it('falls back when winner is null', async () => {
+    vi.mocked(api.fetchGameMetrics).mockResolvedValueOnce(makePayload(null))
+    const wrapper = mount(EndState)
+    await flushPromises()
+    expect(wrapper.text()).toContain('IN PROGRESS')
   })
 })

@@ -1,318 +1,193 @@
 <template>
-  <v-layout>
-    <AppNav />
+  <v-container class="r-leaderboard" max-width="1100">
+    <header class="r-header">
+      <h1 class="r-title">LEADERBOARD</h1>
+      <p class="r-sub">The board re-weights games toward recent play (default α=0.95).</p>
+    </header>
 
-    <v-main style="height: 100vh; overflow-y: auto">
-      <v-container class="py-6">
+    <div class="r-tabs">
+      <button
+        v-for="t in tabs"
+        :key="t.metric"
+        class="r-tab"
+        :class="{ 'r-tab-active': activeMetric === t.metric }"
+        type="button"
+        @click="setMetric(t.metric)"
+      >
+        {{ t.label }}
+      </button>
+    </div>
 
-        <v-row class="mb-4" justify="center">
-          <v-col class="text-center" cols="12">
-            <div class="leaderboard-title">Global Leaderboard</div>
-          </v-col>
-        </v-row>
+    <SideTable
+      :columns="columns"
+      empty-text="Not enough games yet — play more to populate the board."
+      :row-class="rowClass"
+      :rows="rows"
+      @row-click="goToProfile"
+    >
+      <template #cell.rank="{ row }">
+        <span class="r-rank tabular-nums" :class="rankBadge(row.rank)">{{ row.rank }}</span>
+      </template>
 
-        <v-row justify="center">
-          <v-col cols="12" md="8">
-            <div
-              class="leaderboard-section-label text-center mb-3"
-              :class="labelClass"
-            >{{ activeMode === 'elo' ? 'Elo' : activeMode === 'spy' ? 'Spy' : 'Resistance' }}</div>
+      <template #cell.player="{ row }">
+        <div class="d-flex align-center">
+          <v-avatar v-if="row.pfp" class="mr-2" :size="28">
+            <v-img :src="row.pfp" />
+          </v-avatar>
 
-            <v-card class="stat-section" :class="cardClass" elevation="4">
-              <v-card-text class="d-flex flex-column pa-0">
+          <v-avatar v-else class="mr-2" color="surface-elevated" :size="28">
+            <v-icon icon="mdi-account" size="small" />
+          </v-avatar>
 
-                <!-- Header row with toggle buttons -->
-                <div class="stat-section-header d-flex align-center justify-space-between">
-                  <span>TOP PLAYERS</span>
+          <span>{{ row.username ?? `#${row.userid}` }}</span>
+        </div>
+      </template>
 
-                  <div class="d-flex gap-1">
-                    <v-btn
-                      :color="activeMode === 'elo' ? 'white' : undefined"
-                      density="compact"
-                      size="small"
-                      :variant="activeMode === 'elo' ? 'flat' : 'text'"
-                      @click="activeMode = 'elo'"
-                    >Elo</v-btn>
+      <template #cell.value="{ row }">
+        <span class="tabular-nums">{{ formatValue(row.value) }}</span>
+      </template>
 
-                    <v-btn
-                      :color="activeMode === 'spy' ? 'red-lighten-2' : undefined"
-                      density="compact"
-                      size="small"
-                      :variant="activeMode === 'spy' ? 'flat' : 'text'"
-                      @click="activeMode = 'spy'"
-                    >Spy</v-btn>
+      <template #cell.games="{ row }">
+        <span class="text-medium-emphasis tabular-nums">{{ row.games }}</span>
+      </template>
+    </SideTable>
 
-                    <v-btn
-                      :color="activeMode === 'resistance' ? 'blue-lighten-2' : undefined"
-                      density="compact"
-                      size="small"
-                      :variant="activeMode === 'resistance' ? 'flat' : 'text'"
-                      @click="activeMode = 'resistance'"
-                    >Resistance</v-btn>
-                  </div>
-                </div>
-
-                <!-- Player list -->
-                <div class="player-list">
-                  <template v-for="(player, i) in activePlayers" :key="player.name">
-                    <v-tooltip
-                      v-if="activeMode === 'elo'"
-                      location="end"
-                    >
-                      <template #activator="{ props }">
-                        <div class="player-row" v-bind="props">
-                          <span class="player-rank">{{ i + 1 }}</span>
-                          <span class="player-name">{{ player.name }}</span>
-                          <span class="player-score">{{ player.score }}</span>
-                        </div>
-                      </template>
-
-                      <div>
-                        <div>Spy: {{ (player as EloPlayer).spyScore }}</div>
-                        <div>Resistance: {{ (player as EloPlayer).resistanceScore }}</div>
-                      </div>
-                    </v-tooltip>
-
-                    <div v-else class="player-row">
-                      <span class="player-rank">{{ i + 1 }}</span>
-                      <span class="player-name">{{ player.name }}</span>
-                      <span class="player-score">{{ player.score }}</span>
-                    </div>
-                  </template>
-                </div>
-
-                <v-divider class="my-divider" />
-
-                <div class="you-row">
-                  <span class="player-rank you-rank">{{ yourRank }}</span>
-                  <span class="player-name you-label">You</span>
-                  <span class="player-score">{{ yourScore }}</span>
-                </div>
-
-              </v-card-text>
-            </v-card>
-          </v-col>
-        </v-row>
-
-      </v-container>
-    </v-main>
-  </v-layout>
+    <div v-if="loading" class="r-status text-medium-emphasis">Loading…</div>
+    <div v-if="error" class="r-status text-error">{{ error }}</div>
+  </v-container>
 </template>
 
 <script setup lang="ts">
-  import { computed, ref } from 'vue'
-  import AppNav from '@/components/AppNav.vue'
+  import { computed, onMounted, ref, watch } from 'vue'
+  import { useRouter } from 'vue-router'
+  import SideTable from '@/components/SideTable.vue'
+  import { fetchLeaderboard, type LeaderboardEntry, type LeaderboardMetric } from '@/services/api'
 
-  interface Player {
-    name: string
-    score: number
+  const router = useRouter()
+
+  const tabs: Array<{ metric: LeaderboardMetric, label: string }> = [
+    { metric: 'pIndex', label: 'OVERALL' },
+    { metric: 'rIndex', label: 'RESISTANCE' },
+    { metric: 'sIndex', label: 'SPY' },
+    { metric: 'lifetimePoints', label: 'LIFETIME PTS' },
+  ]
+
+  const activeMetric = ref<LeaderboardMetric>('pIndex')
+  const rows = ref<LeaderboardEntry[]>([])
+  const loading = ref(false)
+  const error = ref('')
+
+  const isPoints = computed(() => activeMetric.value === 'lifetimePoints')
+
+  const columns = computed(() => [
+    { key: 'rank', label: '#', align: 'center' as const, width: '64px' },
+    { key: 'player', label: 'PLAYER', align: 'left' as const },
+    { key: 'value', label: isPoints.value ? 'POINTS' : 'INDEX', align: 'right' as const, width: '120px' },
+    { key: 'games', label: 'GAMES', align: 'right' as const, width: '90px' },
+  ])
+
+  function setMetric (m: LeaderboardMetric) {
+    if (activeMetric.value === m) return
+    activeMetric.value = m
   }
 
-  interface EloPlayer extends Player {
-    spyScore: number
-    resistanceScore: number
+  function formatValue (v: number): string {
+    if (isPoints.value) return v.toString()
+    return v.toFixed(2)
   }
 
-  const activeMode = ref<'elo' | 'spy' | 'resistance'>('elo')
-
-  const eloPlayers: EloPlayer[] = [
-    { name: 'ShadowBlade', score: 100, spyScore: 85, resistanceScore: 72 },
-    { name: 'NightOwl', score: 100, spyScore: 70, resistanceScore: 90 },
-    { name: 'IronFox', score: 100, spyScore: 60, resistanceScore: 95 },
-    { name: 'CrimsonTide', score: 100, spyScore: 88, resistanceScore: 65 },
-    { name: 'GhostWolf', score: 100, spyScore: 92, resistanceScore: 58 },
-    { name: 'StormRider', score: 100, spyScore: 55, resistanceScore: 88 },
-    { name: 'FrostByte', score: 100, spyScore: 78, resistanceScore: 75 },
-    { name: 'VoidWalker', score: 100, spyScore: 82, resistanceScore: 70 },
-    { name: 'ArcLight', score: 100, spyScore: 65, resistanceScore: 82 },
-    { name: 'DuskHunter', score: 100, spyScore: 74, resistanceScore: 79 },
-  ]
-
-  const resistancePlayers: Player[] = [
-    { name: 'IronFox', score: 100 },
-    { name: 'ArcLight', score: 100 },
-    { name: 'StormRider', score: 100 },
-    { name: 'FrostByte', score: 100 },
-    { name: 'NightOwl', score: 100 },
-    { name: 'DuskHunter', score: 100 },
-    { name: 'VoidWalker', score: 100 },
-    { name: 'ShadowBlade', score: 100 },
-    { name: 'CrimsonTide', score: 100 },
-    { name: 'GhostWolf', score: 100 },
-  ]
-
-  const spyPlayers: Player[] = [
-    { name: 'GhostWolf', score: 100 },
-    { name: 'CrimsonTide', score: 100 },
-    { name: 'VoidWalker', score: 100 },
-    { name: 'ShadowBlade', score: 100 },
-    { name: 'DuskHunter', score: 100 },
-    { name: 'FrostByte', score: 100 },
-    { name: 'ArcLight', score: 100 },
-    { name: 'IronFox', score: 100 },
-    { name: 'NightOwl', score: 100 },
-    { name: 'StormRider', score: 100 },
-  ]
-
-  const yourEloRank = 50
-  const yourResistanceRank = 50
-  const yourSpyRank = 50
-
-  const activePlayers = computed(() => {
-    if (activeMode.value === 'elo') return eloPlayers
-    if (activeMode.value === 'spy') return spyPlayers
-    return resistancePlayers
-  })
-
-  const yourRank = computed(() => {
-    if (activeMode.value === 'elo') return yourEloRank
-    if (activeMode.value === 'spy') return yourSpyRank
-    return yourResistanceRank
-  })
-
-  const yourScore = computed(() => {
-    if (activeMode.value === 'elo') return 32
-    if (activeMode.value === 'spy') return 32
-    return 12
-  })
-
-  const cardClass = computed(() => {
-    if (activeMode.value === 'spy') return 'stat-section--red'
-    if (activeMode.value === 'resistance') return 'stat-section--blue'
+  function rankBadge (rank: number): string {
+    if (rank === 1) return 'r-rank-1'
+    if (rank === 2) return 'r-rank-2'
+    if (rank === 3) return 'r-rank-3'
     return ''
-  })
+  }
 
-  const labelClass = computed(() => {
-    if (activeMode.value === 'spy') return 'leaderboard-label--red'
-    if (activeMode.value === 'resistance') return 'leaderboard-label--blue'
-    return 'leaderboard-label--white'
-  })
+  function rowClass (row: LeaderboardEntry): string {
+    return row.rank <= 3 ? 'r-row-podium' : ''
+  }
+
+  function goToProfile (row: LeaderboardEntry) {
+    if (row.username) router.push(`/Profile/${encodeURIComponent(row.username)}`)
+  }
+
+  async function load () {
+    loading.value = true
+    error.value = ''
+    try {
+      const r = await fetchLeaderboard(activeMetric.value, 50)
+      rows.value = r.rows
+    } catch (error_) {
+      error.value = (error_ as Error).message
+      rows.value = []
+    } finally {
+      loading.value = false
+    }
+  }
+
+  watch(activeMetric, load)
+  onMounted(load)
 </script>
 
 <style scoped>
-.leaderboard-title {
+.r-leaderboard { padding-top: 32px; padding-bottom: 48px; }
+.r-header { margin-bottom: 24px; }
+.r-title {
   font-size: 2rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.92);
+  font-weight: 300;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+.r-sub {
+  color: rgb(var(--v-theme-on-surface-muted));
+  font-size: 0.825rem;
+  letter-spacing: 0.04em;
+  margin-top: 4px;
 }
 
-.leaderboard-section-label {
-  font-size: 1.4rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-}
-
-.leaderboard-label--white {
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.leaderboard-label--blue {
-  color: #90caf9;
-}
-
-.leaderboard-label--red {
-  color: #ef9a9a;
-}
-
-.stat-section {
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.stat-section-header {
-  padding: 8px 14px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.08);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.stat-section--blue .stat-section-header {
-  color: #90caf9;
-  background: rgba(33, 150, 243, 0.12);
-  border-bottom-color: rgba(33, 150, 243, 0.2);
-}
-
-.stat-section--blue {
-  border-color: rgba(33, 150, 243, 0.25);
-}
-
-.stat-section--red .stat-section-header {
-  color: #ef9a9a;
-  background: rgba(244, 67, 54, 0.12);
-  border-bottom-color: rgba(244, 67, 54, 0.2);
-}
-
-.stat-section--red {
-  border-color: rgba(244, 67, 54, 0.25);
-}
-
-.player-list {
-  flex: 1;
-  padding: 6px 0;
-}
-
-.player-row {
+.r-tabs {
   display: flex;
-  align-items: center;
-  padding: 10px 16px;
-  gap: 10px;
-  transition: background 0.15s;
-  cursor: default;
-}
-
-.player-row:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.player-rank {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.4);
-  width: 22px;
-  text-align: right;
-  flex-shrink: 0;
-}
-
-.player-name {
-  flex: 1;
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.player-score {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.my-divider {
-  border-color: rgba(255, 255, 255, 0.1) !important;
-  margin: 4px 0;
-}
-
-.you-row {
-  display: flex;
-  align-items: center;
-  padding: 8px 16px;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.you-rank {
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.you-label {
-  font-style: italic;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.gap-1 {
+  flex-wrap: wrap;
   gap: 4px;
+  margin-bottom: 16px;
+  padding: 4px;
+  background-color: rgb(var(--v-theme-surface));
+  border: 1px solid rgb(var(--v-theme-border));
+  border-radius: 8px;
 }
+.r-tab {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  padding: 8px 12px;
+  font-family: var(--r-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: rgb(var(--v-theme-on-surface-muted));
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 200ms ease-out;
+  min-width: 120px;
+}
+.r-tab:hover  { color: rgb(var(--v-theme-on-surface)); }
+.r-tab-active {
+  background-color: rgb(var(--v-theme-surface-elevated));
+  color: var(--r-resistance);
+}
+
+.r-rank {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
+  border-radius: 50%;
+  text-align: center;
+  font-weight: 500;
+}
+.r-rank-1 { background-color: rgba(245, 158, 11, 0.18); color: #f59e0b; }
+.r-rank-2 { background-color: rgba(148, 163, 184, 0.18); color: #94a3b8; }
+.r-rank-3 { background-color: rgba(180, 83,  9,  0.18); color: #d97706; }
+.r-row-podium { /* hover affordance only — color comes from rank badge */ }
+
+.r-status { text-align: center; padding: 16px; font-size: 0.875rem; }
 </style>

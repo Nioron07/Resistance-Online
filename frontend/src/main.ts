@@ -15,6 +15,11 @@ import App from './App.vue'
 
 // Styles
 import 'unfonts.css'
+import '@fontsource/jetbrains-mono/300.css'
+import '@fontsource/jetbrains-mono/400.css'
+import '@fontsource/jetbrains-mono/500.css'
+import '@fontsource/jetbrains-mono/700.css'
+import '@/styles/settings.scss'
 
 const app = createApp(App)
 

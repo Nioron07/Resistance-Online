@@ -15,6 +15,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.2.8",
     "@fontsource/roboto": "5.2.7",
     "@mdi/font": "7.4.47",
     "apexcharts": "^5.10.6",

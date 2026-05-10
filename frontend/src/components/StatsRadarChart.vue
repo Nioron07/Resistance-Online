@@ -27,14 +27,14 @@
     chart: { type: 'radar' as const, toolbar: { show: false }, background: 'transparent' },
     xaxis: { categories: ['Leadership', 'Deception / ROI', 'Detection / ROS', 'Consistency', 'Trust'] },
     yaxis: { min: 0, max: 100, show: false },
-    fill: { colors: ['rgba(180,180,180,0.15)'] },
-    stroke: { colors: ['rgba(180,180,180,0.7)'], width: 1 },
-    markers: { colors: ['rgba(180,180,180,0.9)'], size: 3 },
+    fill: { colors: ['rgba(59, 130, 246, 0.18)'] },
+    stroke: { colors: ['rgba(59, 130, 246, 0.85)'], width: 1.5 },
+    markers: { colors: ['rgba(59, 130, 246, 0.95)'], size: 3 },
     plotOptions: {
       radar: {
         polygons: {
-          strokeColors: 'rgba(150,150,150,0.3)',
-          connectorColors: 'rgba(150,150,150,0.3)',
+          strokeColors: 'rgba(31, 41, 55, 0.7)',
+          connectorColors: 'rgba(31, 41, 55, 0.5)',
           fill: { colors: ['transparent'] },
         },
       },

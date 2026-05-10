@@ -6,9 +6,9 @@ import IdentitySelection from '@/pages/Game/[GameID]/IdentitySelection.vue'
 describe('IdentitySelection Cases', () => {
   it('renders both buttons', () => {
     const wrapper = mount(IdentitySelection)
-    expect(wrapper.text()).toContain('Spy')
-    expect(wrapper.text()).toContain('Resistance')
-    expect(wrapper.text()).toContain('Select your Identity')
+    expect(wrapper.text()).toContain('SPY')
+    expect(wrapper.text()).toContain('RESISTANCE')
+    expect(wrapper.text()).toContain('SELECT YOUR IDENTITY')
 
     const buttons = wrapper.findAllComponents(VBtn)
     expect(buttons.length).toBe(2)

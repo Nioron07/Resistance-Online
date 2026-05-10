@@ -46,6 +46,23 @@ const PLAYERS_5_USER1_SPY = {
 
 describe('Metrics', () => {
 
+    describe('lifetimePoints (extended response)', () => {
+        it('defaults all to zero when not provided', () => {
+            const r = computeMetrics('1', []);
+            expect(r.lifetimePoints).toEqual({ resistance: 0, spy: 0, total: 0 });
+        });
+
+        it('passes the provided sums through and totals correctly', () => {
+            const r = computeMetrics('1', [], { resistance: 14, spy: 9 });
+            expect(r.lifetimePoints).toEqual({ resistance: 14, spy: 9, total: 23 });
+        });
+
+        it('handles negative spy points', () => {
+            const r = computeMetrics('1', [], { resistance: 5, spy: -2 });
+            expect(r.lifetimePoints).toEqual({ resistance: 5, spy: -2, total: 3 });
+        });
+    });
+
     describe('computeMetrics — no rounds', () => {
         it('returns all nulls when there are no rounds', () => {
             const result = computeMetrics('1', []);

@@ -23,7 +23,7 @@ describe('TeamSelection Cases', () => {
     const store = useGameStore()
     store.leaderId = 2 // someone else is the leader
     const wrapper = mount(TeamSelection)
-    expect(wrapper.text()).toContain('is currently making team selections')
+    expect(wrapper.text()).toContain('IS PICKING')
   })
 
   it('confirm button submits the selected team via submitNomination', async () => {

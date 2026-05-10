@@ -32,7 +32,7 @@ describe('TeamVote Cases', () => {
     await wrapper.vm.$nextTick()
 
     expect(voteSpy).toHaveBeenCalledWith(true)
-    expect(wrapper.text()).toContain('Vote submitted')
+    expect(wrapper.text()).toContain('VOTE SUBMITTED')
   })
 
   it('reject button calls castVote(false)', async () => {

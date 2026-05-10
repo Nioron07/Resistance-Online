@@ -1,16 +1,25 @@
 <template>
-  <!-- This the Nav for PC jit -->
-  <v-navigation-drawer v-if="!display.smAndDown.value" expand-on-hover permanent rail>
+  <!-- Desktop: slim left rail -->
+  <v-navigation-drawer
+    v-if="!display.smAndDown.value"
+    class="r-nav"
+    :elevation="0"
+    expand-on-hover
+    permanent
+    rail
+  >
     <v-list>
       <v-list-item
         v-if="appStore.isAuthenticated"
         :prepend-avatar="appStore.user?.pfp"
+        :subtitle="userIdLabel"
         :title="appStore.user?.username"
       />
 
       <v-list-item
         v-else
         prepend-icon="mdi-account-circle"
+        subtitle="Not signed in"
         title="Guest"
       />
     </v-list>
@@ -18,24 +27,41 @@
     <v-divider />
 
     <v-list density="compact" nav>
-      <v-list-item prepend-icon="mdi-home" title="Home" value="home" @click="router.push('/')" />
-      <!--      <v-list-item prepend-icon="mdi-trophy" title="Leaderboard" value="leaderboard" @click="router.push('/Leaderboard')" /> -->
+      <v-list-item
+        :active="route.path === '/'"
+        prepend-icon="mdi-home"
+        title="Home"
+        @click="router.push('/')"
+      />
+
+      <v-list-item
+        :active="route.path.startsWith('/Leaderboard')"
+        prepend-icon="mdi-trophy"
+        title="Leaderboard"
+        @click="router.push('/Leaderboard')"
+      />
 
       <template v-if="appStore.isAuthenticated">
-        <v-list-item prepend-icon="mdi-chart-bar" title="My Stats" value="stats" @click="router.push(`/Profile/${appStore.user?.username}`)" />
-        <v-list-item prepend-icon="mdi-logout" title="Logout" value="logout" @click="appStore.logout()" />
+        <v-list-item
+          :active="route.path.startsWith('/Profile')"
+          prepend-icon="mdi-chart-bar"
+          title="My Stats"
+          @click="router.push(`/Profile/${appStore.user?.username}`)"
+        />
+
+        <v-list-item prepend-icon="mdi-logout" title="Logout" @click="appStore.logout()" />
       </template>
 
       <template v-else>
-        <v-list-item prepend-icon="mdi-login" title="Login" value="login" @click="router.push('/Login/Login')" />
+        <v-list-item prepend-icon="mdi-login" title="Login" @click="router.push('/Login/Login')" />
       </template>
     </v-list>
   </v-navigation-drawer>
 
-  <!-- This the Mobile jit -->
-  <v-app-bar v-else>
-    <v-app-bar-title>
-      {{ appStore.isAuthenticated ? appStore.user?.username : 'Account' }}
+  <!-- Mobile: top app bar with drawer menu -->
+  <v-app-bar v-else class="r-mobile-bar" density="compact" flat>
+    <v-app-bar-title class="r-mobile-title">
+      {{ pageTitle }}
     </v-app-bar-title>
 
     <v-menu>
@@ -46,16 +72,16 @@
       </template>
 
       <v-list density="compact" nav>
-        <v-list-item prepend-icon="mdi-home" title="Home" value="home" @click="router.push('/')" />
-        <v-list-item prepend-icon="mdi-trophy" title="Leaderboard" value="leaderboard" @click="router.push('/Leaderboard')" />
+        <v-list-item prepend-icon="mdi-home" title="Home" @click="router.push('/')" />
+        <v-list-item prepend-icon="mdi-trophy" title="Leaderboard" @click="router.push('/Leaderboard')" />
 
         <template v-if="appStore.isAuthenticated">
-          <v-list-item prepend-icon="mdi-chart-bar" title="My Stats" value="stats" @click="router.push(`/Profile/${appStore.user?.username}`)" />
-          <v-list-item prepend-icon="mdi-logout" title="Logout" value="logout" @click="appStore.logout()" />
+          <v-list-item prepend-icon="mdi-chart-bar" title="My Stats" @click="router.push(`/Profile/${appStore.user?.username}`)" />
+          <v-list-item prepend-icon="mdi-logout" title="Logout" @click="appStore.logout()" />
         </template>
 
         <template v-else>
-          <v-list-item prepend-icon="mdi-login" title="Login" value="login" @click="router.push('/Login/Login')" />
+          <v-list-item prepend-icon="mdi-login" title="Login" @click="router.push('/Login/Login')" />
         </template>
       </v-list>
     </v-menu>
@@ -63,11 +89,40 @@
 </template>
 
 <script setup lang="ts">
-  import { useRouter } from 'vue-router'
+  import { computed } from 'vue'
+  import { useRoute, useRouter } from 'vue-router'
   import { useDisplay } from 'vuetify'
   import { useAppStore } from '@/stores/app'
 
   const display = useDisplay()
   const router = useRouter()
+  const route = useRoute()
   const appStore = useAppStore()
+
+  const userIdLabel = computed(() => appStore.user?.id ? `#${appStore.user.id}` : '')
+
+  const pageTitle = computed(() => {
+    const p = route.path
+    if (p === '/') return 'Resistance'
+    if (p.startsWith('/Leaderboard')) return 'Leaderboard'
+    if (p.startsWith('/Profile')) return 'My Stats'
+    if (p.startsWith('/Game')) return 'Game'
+    if (p.startsWith('/Login')) return 'Sign In'
+    return 'Resistance'
+  })
 </script>
+
+<style scoped>
+.r-nav {
+  background-color: rgb(var(--v-theme-surface)) !important;
+  border-right: 1px solid rgb(var(--v-theme-border)) !important;
+}
+.r-mobile-bar {
+  background-color: rgb(var(--v-theme-surface)) !important;
+  border-bottom: 1px solid rgb(var(--v-theme-border)) !important;
+}
+.r-mobile-title {
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+</style>
