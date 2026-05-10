@@ -67,6 +67,21 @@
         />
       </template>
     </v-list>
+
+    <!-- Bottom-anchored About link. The drawer's `append` slot renders at
+         the bottom of the rail, separated by a divider. -->
+    <template #append>
+      <v-divider />
+
+      <v-list density="compact" nav>
+        <v-list-item
+          :active="route.path.startsWith('/About')"
+          prepend-icon="mdi-information-outline"
+          title="About"
+          @click="router.push('/About')"
+        />
+      </v-list>
+    </template>
   </v-navigation-drawer>
 
   <!-- Mobile: top app bar with drawer menu -->
@@ -116,6 +131,14 @@
             @click="router.push('/Login/Login')"
           />
         </template>
+
+        <v-divider class="my-1" />
+
+        <v-list-item
+          prepend-icon="mdi-information-outline"
+          title="About"
+          @click="router.push('/About')"
+        />
       </v-list>
     </v-menu>
   </v-app-bar>
@@ -143,6 +166,7 @@
     if (p.startsWith('/Profile')) return 'My Stats'
     if (p.startsWith('/Game')) return 'Game'
     if (p.startsWith('/Login')) return 'Sign In'
+    if (p.startsWith('/About')) return 'About'
     return 'Resistance'
   })
 </script>

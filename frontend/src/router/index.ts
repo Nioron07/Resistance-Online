@@ -43,9 +43,11 @@ router.beforeEach(async to => {
 
   const path = to.path
   const isLoginRoute = path.startsWith('/Login/')
+  // Public pages — accessible without authentication.
+  const isPublicRoute = path === '/About' || path.startsWith('/About/')
 
   if (!appStore.isAuthenticated) {
-    return isLoginRoute ? true : { path: '/Login/Login' }
+    return (isLoginRoute || isPublicRoute) ? true : { path: '/Login/Login' }
   }
 
   // Authenticated but hasn't confirmed their username yet — funnel them

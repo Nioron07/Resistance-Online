@@ -19,6 +19,7 @@ declare module 'vue-router/auto-routes' {
    */
   export interface RouteNamedMap {
     '/': RouteRecordInfo<'/', '/', Record<never, never>, Record<never, never>>,
+    '/About': RouteRecordInfo<'/About', '/About', Record<never, never>, Record<never, never>>,
     '/Game/[GameID]': RouteRecordInfo<'/Game/[GameID]', '/Game/:GameID', { GameID: ParamValue<true> }, { GameID: ParamValue<false> }, '/Game/[GameID]/EndState' | '/Game/[GameID]/IdentitySelection' | '/Game/[GameID]/Lobby' | '/Game/[GameID]/MissionPhase' | '/Game/[GameID]/SuspicionPhase' | '/Game/[GameID]/TeamSelection' | '/Game/[GameID]/TeamVote'>,
     '/Game/[GameID]/EndState': RouteRecordInfo<'/Game/[GameID]/EndState', '/Game/:GameID/EndState', { GameID: ParamValue<true> }, { GameID: ParamValue<false> }>,
     '/Game/[GameID]/IdentitySelection': RouteRecordInfo<'/Game/[GameID]/IdentitySelection', '/Game/:GameID/IdentitySelection', { GameID: ParamValue<true> }, { GameID: ParamValue<false> }>,
@@ -46,6 +47,10 @@ declare module 'vue-router/auto-routes' {
   export interface _RouteFileInfoMap {
     'src/pages/index.vue': {
       routes: '/'
+      views: never
+    }
+    'src/pages/About.vue': {
+      routes: '/About'
       views: never
     }
     'src/pages/Game/[GameID].vue': {
