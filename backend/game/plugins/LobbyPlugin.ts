@@ -34,7 +34,7 @@ export class LobbyPlugin extends GamePlugin {
             if (this.room.host === null) this.room.host = e.playerId;
 
             this.room.broadcast("player:joined", {playerId: e.playerId, players: [...state.seatOrder]});
-            this.room.broadcast("lobby:reordered", {seatOrder: [...state.seatOrder]});
+            this.room.broadcast("lobby:reordered", {seatOrder: [...state.seatOrder], hostId: this.room.host});
 
             await DAC.resistance.games.id(meta_data.gameid).playerId(e.playerId).add();
         })
@@ -57,7 +57,7 @@ export class LobbyPlugin extends GamePlugin {
             }
 
             this.room.broadcast("player:left", {playerId: e.playerId});
-            this.room.broadcast("lobby:reordered", {seatOrder: [...state.seatOrder]});
+            this.room.broadcast("lobby:reordered", {seatOrder: [...state.seatOrder], hostId: this.room.host});
 
             await DAC.resistance.games.id(meta_data.gameid).playerId(e.playerId).remove();
 
@@ -98,7 +98,7 @@ export class LobbyPlugin extends GamePlugin {
             }
 
             state.seatOrder = [...e.seatOrder];
-            this.room.broadcast("lobby:reordered", {seatOrder: [...state.seatOrder]});
+            this.room.broadcast("lobby:reordered", {seatOrder: [...state.seatOrder], hostId: this.room.host});
         });
 
         bus.on("game:configure", 999, async (e) => {

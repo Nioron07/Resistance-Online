@@ -50,6 +50,7 @@ export const useGameStore = defineStore('game', () => {
   // players
   const playerIds = ref<PlayerId[]>([])
   const playerProfiles = ref<Record<PlayerId, PlayerProfile>>({})
+  const hostId = ref<PlayerId | null>(null)
 
   // game flow
   const leaderId = ref<PlayerId | null>(null)
@@ -68,7 +69,7 @@ export const useGameStore = defineStore('game', () => {
 
   // derived
   const playerCount = computed(() => playerIds.value.length)
-  const isHost = computed(() => myId.value !== null && playerIds.value[0] === myId.value)
+  const isHost = computed(() => myId.value !== null && hostId.value !== null && hostId.value === myId.value)
   const amLeader = computed(() => myId.value !== null && myId.value === leaderId.value)
   const amOnTeam = computed(() => myId.value !== null && nominatedTeam.value.includes(myId.value))
 
@@ -155,6 +156,7 @@ export const useGameStore = defineStore('game', () => {
      */
     socket.on('lobby:reordered', d => {
       playerIds.value = [...d.seatOrder]
+      hostId.value = d.hostId
     })
 
     socket.on('game:started', () => {
@@ -393,7 +395,7 @@ export const useGameStore = defineStore('game', () => {
     // players
     playerIds, playerProfiles, playerNames, playerCount,
     // host / leader
-    isHost, leaderId, leaderName, amLeader,
+    isHost, hostId, leaderId, leaderName, amLeader,
     // game flow
     mission, round, nominatedTeam, nominatedTeamNames, amOnTeam,
     votesReceived, lastVoteResult,

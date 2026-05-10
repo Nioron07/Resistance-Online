@@ -142,6 +142,7 @@ export type ServerEvents = {
      */
     'lobby:reordered': {
         seatOrder: PlayerId[];
+        hostId: PlayerId | null;
     }
 
     'game:started': Record<string, never>
