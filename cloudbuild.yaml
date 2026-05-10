@@ -1,0 +1,62 @@
+# Cloud Build pipeline for Cloud Run Source Deploy.
+#
+# Cloud Run's auto-generated build path uses the GitHub repo name verbatim,
+# so it produces "cloud-run-source-deploy/Resistance-Online/<service>" —
+# which Docker rejects because image components must be lowercase.
+#
+# This file overrides the auto-generated build with an explicit one that
+# uses a lowercase path. To deploy a service with a different name or
+# region, override the substitutions on the Cloud Build trigger.
+#
+# Required trigger substitutions (defaults shown):
+#   _IMAGE_PATH  europe-west1-docker.pkg.dev/orbu-test-2/cloud-run-source-deploy/resistance-online/team-26-087
+#   _SERVICE     team-26-087
+#   _REGION      europe-west1
+
+steps:
+  # Build the multi-stage Dockerfile at the repo root.
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - '${_IMAGE_PATH}:${SHORT_SHA}'
+      - -t
+      - '${_IMAGE_PATH}:latest'
+      - .
+
+  # Push both tags to Artifact Registry.
+  - id: push-sha
+    name: gcr.io/cloud-builders/docker
+    args: [push, '${_IMAGE_PATH}:${SHORT_SHA}']
+    waitFor: [build]
+  - id: push-latest
+    name: gcr.io/cloud-builders/docker
+    args: [push, '${_IMAGE_PATH}:latest']
+    waitFor: [build]
+
+  # Deploy to Cloud Run.
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - '${_SERVICE}'
+      - --image=${_IMAGE_PATH}:${SHORT_SHA}
+      - --region=${_REGION}
+      - --platform=managed
+      - --quiet
+    waitFor: [push-sha]
+
+images:
+  - '${_IMAGE_PATH}:${SHORT_SHA}'
+  - '${_IMAGE_PATH}:latest'
+
+substitutions:
+  _IMAGE_PATH: europe-west1-docker.pkg.dev/orbu-test-2/cloud-run-source-deploy/resistance-online/team-26-087
+  _SERVICE: team-26-087
+  _REGION: europe-west1
+
+options:
+  logging: CLOUD_LOGGING_ONLY
