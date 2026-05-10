@@ -2,14 +2,16 @@
   <article class="r-contrib r-card-hover">
     <!-- Hero: ASCII art OR image OR fallback icon. -->
     <div class="r-contrib-hero" :class="heroClass">
-      <pre v-if="asciiArt" aria-hidden="true" class="r-contrib-ascii">{{ asciiArt }}</pre>
+      <pre v-if="asciiArt" aria-hidden="true" class="r-contrib-ascii">{{
+        asciiArt
+      }}</pre>
 
       <img
         v-else-if="imageSrc"
         :alt="`${name} portrait`"
         class="r-contrib-img"
         :src="imageSrc"
-      >
+      />
 
       <div v-else class="r-contrib-fallback">
         <v-icon icon="mdi-account" size="64" />
@@ -42,37 +44,40 @@
 </template>
 
 <script setup lang="ts">
-  import { computed } from 'vue'
+import { computed } from "vue";
 
-  interface ContribLink {
-    label: string
-    href: string
-    icon?: string
-  }
+interface ContribLink {
+  label: string;
+  href: string;
+  icon?: string;
+}
 
-  const props = withDefaults(defineProps<{
-    name: string
-    bio?: string
+const props = withDefaults(
+  defineProps<{
+    name: string;
+    bio?: string;
     /** Mutually exclusive with imageSrc — if both are present, ASCII wins. */
-    asciiArt?: string
-    imageSrc?: string
-    links?: ContribLink[]
-  }>(), {
-    bio: '',
-    asciiArt: '',
-    imageSrc: '',
+    asciiArt?: string;
+    imageSrc?: string;
+    links?: ContribLink[];
+  }>(),
+  {
+    bio: "",
+    asciiArt: "",
+    imageSrc: "",
     links: () => [],
-  })
+  },
+);
 
-  /**
-   * Different hero kinds need slightly different padding / sizing rules.
-   * The class hook lets us scope those without conflating selectors.
-   */
-  const heroClass = computed(() => ({
-    'r-contrib-hero-ascii': !!props.asciiArt,
-    'r-contrib-hero-img': !props.asciiArt && !!props.imageSrc,
-    'r-contrib-hero-empty': !props.asciiArt && !props.imageSrc,
-  }))
+/**
+ * Different hero kinds need slightly different padding / sizing rules.
+ * The class hook lets us scope those without conflating selectors.
+ */
+const heroClass = computed(() => ({
+  "r-contrib-hero-ascii": !!props.asciiArt,
+  "r-contrib-hero-img": !props.asciiArt && !!props.imageSrc,
+  "r-contrib-hero-empty": !props.asciiArt && !props.imageSrc,
+}));
 </script>
 
 <style scoped>
@@ -95,7 +100,7 @@
   border: 1px solid rgb(var(--v-theme-border));
   border-radius: 8px;
   margin-bottom: 6px;
-  height: 160px;
+  height: 300px;
   overflow: hidden;
 }
 
@@ -108,7 +113,9 @@
 }
 
 /* ASCII hero: tiny mono so the wide art fits within a half-page card. */
-.r-contrib-hero-ascii { padding: 6px; }
+.r-contrib-hero-ascii {
+  padding: 6px;
+}
 .r-contrib-ascii {
   font-family: var(--r-mono);
   /* Tighter than the standalone hero variant — these cards are ~half page wide. */
@@ -164,7 +171,9 @@
   text-transform: uppercase;
   color: var(--r-resistance);
   text-decoration: none;
-  transition: color 200ms ease-out, border-color 200ms ease-out;
+  transition:
+    color 200ms ease-out,
+    border-color 200ms ease-out;
 }
 .r-contrib-link:hover {
   color: rgb(var(--v-theme-on-surface));
