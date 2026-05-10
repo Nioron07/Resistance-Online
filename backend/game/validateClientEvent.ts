@@ -30,8 +30,21 @@ function isObject(v: unknown): v is Record<string, unknown> {
     return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-function isPlayerIdArray(v: unknown): v is number[] {
-    return Array.isArray(v) && v.every(x => typeof x === 'number' && Number.isInteger(x));
+/**
+ * Player IDs may arrive as integers OR as digit-strings — Postgres returns
+ * BIGINT columns as strings to avoid 53-bit precision loss, so the values
+ * flowing through state and back out via JSON are strings end-to-end.
+ * Either form is valid; downstream comparisons (Map.has, indexOf) are
+ * type-consistent within a single message.
+ */
+function isPlayerId(v: unknown): boolean {
+    if (typeof v === 'number') return Number.isInteger(v);
+    if (typeof v === 'string') return /^-?\d+$/.test(v);
+    return false;
+}
+
+function isPlayerIdArray(v: unknown): v is Array<number | string> {
+    return Array.isArray(v) && v.every(isPlayerId);
 }
 
 /**
@@ -58,8 +71,8 @@ export function validateClientEvent(event: unknown, data: unknown): ValidationRe
         }
 
         case 'game:start': {
-            if (typeof data.leaderId !== 'number' || !Number.isInteger(data.leaderId)) {
-                return fail('leaderId must be an integer');
+            if (!isPlayerId(data.leaderId)) {
+                return fail('leaderId must be a player id (integer or numeric string)');
             }
             if (!isPlayerIdArray(data.seatOrder)) return fail('seatOrder must be PlayerId[]');
             return ok;

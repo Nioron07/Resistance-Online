@@ -76,10 +76,18 @@ describe('validateClientEvent', () => {
             expect(r.ok).toBe(false);
         });
 
-        it('rejects seatOrder containing strings', () => {
+        it('accepts numeric strings (Postgres BIGINT-as-string compatibility)', () => {
+            const r = validateClientEvent('game:start', {
+                leaderId: '1',
+                seatOrder: ['1', '2', 3],
+            });
+            expect(r.ok).toBe(true);
+        });
+
+        it('rejects seatOrder containing non-numeric strings', () => {
             const r = validateClientEvent('game:start', {
                 leaderId: 1,
-                seatOrder: [1, '2', 3],
+                seatOrder: [1, 'two', 3],
             });
             expect(r.ok).toBe(false);
         });
