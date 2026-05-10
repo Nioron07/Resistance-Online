@@ -32,3 +32,9 @@ passport.registerUserDeserializer(async (user: string, _req) => {
  */
 import { Steam } from './passport-strategies/steam.js';
 passport.use("steam", Steam);
+
+/**
+ * Configures Google as an IdP via OAuth 2.0.
+ */
+import { Google } from './passport-strategies/google.js';
+passport.use("google", Google);

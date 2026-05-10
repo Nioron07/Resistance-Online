@@ -58,6 +58,10 @@ export const useAppStore = defineStore('app', () => {
     window.location.href = `${API_BASE}/auth/login/steam`
   }
 
+  function loginWithGoogle () {
+    window.location.href = `${API_BASE}/auth/login/google`
+  }
+
   /**
    * POST /auth/me/username — flips username_set=TRUE in the DB and updates
    * the local user. Returns null on success, or an error message string.
@@ -82,5 +86,5 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  return { user, loading, isAuthenticated, fetchUser, logout, loginWithSteam, setUsername }
+  return { user, loading, isAuthenticated, fetchUser, logout, loginWithSteam, loginWithGoogle, setUsername }
 })

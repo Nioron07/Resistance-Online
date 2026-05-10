@@ -3,12 +3,12 @@
     <v-card class="r-login-card pa-6">
       <header class="r-login-header">
         <h1 class="r-login-title">SIGN IN</h1>
-        <p class="r-login-sub">Steam OpenID. Your username and avatar come from Steam.</p>
+        <p class="r-login-sub">Your username and avatar come from your provider.</p>
       </header>
 
       <v-btn
         block
-        class="r-steam-btn mt-3"
+        class="r-provider-btn mt-3"
         color="primary"
         prepend-icon="mdi-steam"
         size="large"
@@ -18,8 +18,19 @@
         CONTINUE WITH STEAM
       </v-btn>
 
+      <v-btn
+        block
+        class="r-provider-btn mt-3"
+        prepend-icon="mdi-google"
+        size="large"
+        variant="outlined"
+        @click="appStore.loginWithGoogle()"
+      >
+        CONTINUE WITH GOOGLE
+      </v-btn>
+
       <p class="r-login-foot">
-        We don't post to your Steam account. Cookies stay on this site.
+        We don't post to your account. Cookies stay on this site.
       </p>
     </v-card>
   </v-container>
@@ -49,7 +60,7 @@
   letter-spacing: 0.04em;
   margin: 4px 0 0;
 }
-.r-steam-btn { font-weight: 500; letter-spacing: 0.1em; }
+.r-provider-btn { font-weight: 500; letter-spacing: 0.1em; }
 .r-login-foot {
   margin-top: 16px;
   text-align: center;
