@@ -88,6 +88,7 @@
           title="Home"
           @click="router.push('/')"
         />
+
         <v-list-item
           prepend-icon="mdi-trophy"
           title="Leaderboard"
@@ -100,6 +101,7 @@
             title="My Stats"
             @click="router.push(`/Profile/${appStore.user?.username}`)"
           />
+
           <v-list-item
             prepend-icon="mdi-logout"
             title="Logout"
@@ -120,29 +122,29 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { useDisplay } from "vuetify";
-import { useAppStore } from "@/stores/app";
+  import { computed } from 'vue'
+  import { useRoute, useRouter } from 'vue-router'
+  import { useDisplay } from 'vuetify'
+  import { useAppStore } from '@/stores/app'
 
-const display = useDisplay();
-const router = useRouter();
-const route = useRoute();
-const appStore = useAppStore();
+  const display = useDisplay()
+  const router = useRouter()
+  const route = useRoute()
+  const appStore = useAppStore()
 
-const userIdLabel = computed(() =>
-  appStore.user?.id ? `#${appStore.user.id}` : "",
-);
+  const userIdLabel = computed(() =>
+    appStore.user?.id ? `#${appStore.user.id}` : '',
+  )
 
-const pageTitle = computed(() => {
-  const p = route.path;
-  if (p === "/") return "Resistance";
-  if (p.startsWith("/Leaderboard")) return "Leaderboard";
-  if (p.startsWith("/Profile")) return "My Stats";
-  if (p.startsWith("/Game")) return "Game";
-  if (p.startsWith("/Login")) return "Sign In";
-  return "Resistance";
-});
+  const pageTitle = computed(() => {
+    const p = route.path
+    if (p === '/') return 'Resistance'
+    if (p.startsWith('/Leaderboard')) return 'Leaderboard'
+    if (p.startsWith('/Profile')) return 'My Stats'
+    if (p.startsWith('/Game')) return 'Game'
+    if (p.startsWith('/Login')) return 'Sign In'
+    return 'Resistance'
+  })
 </script>
 
 <style scoped>

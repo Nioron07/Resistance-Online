@@ -149,6 +149,14 @@ export const useGameStore = defineStore('game', () => {
       playerIds.value = playerIds.value.filter(id => id !== d.playerId)
     })
 
+    /**
+     * Server is the source of truth for seat order. Sent on every join,
+     * leave, and host-initiated reorder.
+     */
+    socket.on('lobby:reordered', d => {
+      playerIds.value = [...d.seatOrder]
+    })
+
     socket.on('game:started', () => {
       phase.value = 'role-reveal'
       router.push(`/Game/${joinCode.value}/IdentitySelection`)
@@ -368,6 +376,15 @@ export const useGameStore = defineStore('game', () => {
     socket.send('mission:play-card', { card })
   }
 
+  /**
+   * Host-only: send the new lobby seat order to the server. The server
+   * validates + broadcasts `lobby:reordered`, which updates every client
+   * (including this one) via the listener above.
+   */
+  function reorderSeats (seatOrder: PlayerId[]) {
+    socket.send('lobby:reorder', { seatOrder: [...seatOrder] })
+  }
+
   return {
     // identity
     myId,
@@ -386,6 +403,6 @@ export const useGameStore = defineStore('game', () => {
     rules, numSpies, numResistance, teamSizes, currTeamSize, backgroundImage,
     // actions
     connect, disconnect,
-    startGame, submitRole, submitNomination, castVote, submitSuspicions, playMissionCard,
+    startGame, submitRole, submitNomination, castVote, submitSuspicions, playMissionCard, reorderSeats,
   }
 })

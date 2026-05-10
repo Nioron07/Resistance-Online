@@ -46,6 +46,13 @@ export type ClientEventsBase = {
   'mission:play-card': {
     card: boolean
   }
+  /**
+   * Host-only seat reorder during the lobby phase. Server validates that
+   * `seatOrder` contains exactly the current player set with no duplicates.
+   */
+  'lobby:reorder': {
+    seatOrder: PlayerId[]
+  }
 }
 
 export type ServerEvents = {
@@ -55,6 +62,13 @@ export type ServerEvents = {
   }
   'player:left': {
     playerId: PlayerId
+  }
+  /**
+   * Broadcast on join, leave, or explicit lobby:reorder. Clients should
+   * replace their local seat order with the supplied `seatOrder`.
+   */
+  'lobby:reordered': {
+    seatOrder: PlayerId[]
   }
   'game:started': Record<string, never>
   'role:assigned': {

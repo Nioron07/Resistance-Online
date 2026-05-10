@@ -33,6 +33,16 @@ export type ClientEventsBase = {
         card: boolean;
     }
 
+    /**
+     * Host-only, lobby-phase only. Replaces the seat order with the
+     * given permutation of current players. Server validates that
+     * `seatOrder` contains exactly the current set of players in
+     * `state.players` with no duplicates.
+     */
+    'lobby:reorder': {
+        seatOrder: PlayerId[];
+    }
+
     // // immediate cards go into the "hand" and are resolved immediately by the frontend sending 'plot-card:play'
     // 'plot-card:drawn': {
     //     cardName: PlotCardName;
@@ -123,6 +133,15 @@ export type ServerEvents = {
 
     'player:disconnected': {
         playerId: PlayerId;
+    }
+
+    /**
+     * Broadcast whenever the lobby seat order changes — joins, leaves,
+     * or an explicit `lobby:reorder` from the host. Clients should
+     * replace their local seat-order with `seatOrder`.
+     */
+    'lobby:reordered': {
+        seatOrder: PlayerId[];
     }
 
     'game:started': Record<string, never>

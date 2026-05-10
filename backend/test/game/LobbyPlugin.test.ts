@@ -45,6 +45,10 @@ function getLastMessage(ws: WebSocket) {
     return getMessages(ws).at(-1);
 }
 
+function getMessageOfType(ws: WebSocket, event: string) {
+    return getMessages(ws).findLast((m: any) => m.event === event);
+}
+
 async function createRoom() {
     const room = await ResistanceGameRoom.create(1234);
     room.use(new LobbyPlugin());
@@ -102,8 +106,8 @@ describe('LobbyPlugin', () => {
             const ws = createMockSocket(1);
             room.addPlayer(1, ws);
 
-            const msg = getLastMessage(ws);
-            expect(msg.event).toBe('player:joined');
+            const msg = getMessageOfType(ws, 'player:joined');
+            expect(msg).toBeDefined();
             expect(msg.data.playerId).toBe(1);
         });
 
@@ -113,8 +117,8 @@ describe('LobbyPlugin', () => {
             const ws2 = createMockSocket(2);
             room.addPlayer(2, ws2);
 
-            const msg = getLastMessage(ws1);
-            expect(msg.event).toBe('player:joined');
+            const msg = getMessageOfType(ws1, 'player:joined');
+            expect(msg).toBeDefined();
             expect(msg.data.players).toContain(1);
             expect(msg.data.players).toContain(2);
         });
@@ -246,8 +250,8 @@ describe('LobbyPlugin', () => {
             vi.clearAllMocks();
             vi.advanceTimersByTime(8000);
 
-            const msg = getLastMessage(ws2);
-            expect(msg.event).toBe('player:left');
+            const msg = getMessageOfType(ws2, 'player:left');
+            expect(msg).toBeDefined();
             expect(msg.data.playerId).toBe(1);
         });
 
@@ -500,6 +504,86 @@ describe('LobbyPlugin', () => {
 
             expect(room.state.players.get(1)).toBeDefined();
             expect(room.host).toBe(1);
+        });
+    });
+
+    describe('lobby:reorder', () => {
+        it('updates state.seatOrder when sent by the host', () => {
+            addPlayers(room, 3);
+            // initial seat order = join order = [1, 2, 3]
+            expect(room.state.seatOrder).toEqual([1, 2, 3]);
+
+            room.bus.emit('lobby:reorder', { senderId: 1, seatOrder: [3, 1, 2] });
+            expect(room.state.seatOrder).toEqual([3, 1, 2]);
+        });
+
+        it('broadcasts lobby:reordered to every player on a valid reorder', () => {
+            const sockets = addPlayers(room, 3);
+            sockets.forEach(s => (s.send as any).mockClear());
+
+            room.bus.emit('lobby:reorder', { senderId: 1, seatOrder: [3, 1, 2] });
+
+            for (const s of sockets) {
+                const msg = getMessageOfType(s, 'lobby:reordered');
+                expect(msg).toBeDefined();
+                expect(msg.data.seatOrder).toEqual([3, 1, 2]);
+            }
+        });
+
+        it('ignores reorder from a non-host', () => {
+            addPlayers(room, 3);
+            const before = [...room.state.seatOrder];
+            room.bus.emit('lobby:reorder', { senderId: 2, seatOrder: [3, 1, 2] });
+            expect(room.state.seatOrder).toEqual(before);
+        });
+
+        it('ignores a seatOrder of the wrong size', () => {
+            addPlayers(room, 3);
+            const before = [...room.state.seatOrder];
+            room.bus.emit('lobby:reorder', { senderId: 1, seatOrder: [1, 2] });
+            expect(room.state.seatOrder).toEqual(before);
+        });
+
+        it('ignores a seatOrder containing unknown player ids', () => {
+            addPlayers(room, 3);
+            const before = [...room.state.seatOrder];
+            room.bus.emit('lobby:reorder', { senderId: 1, seatOrder: [1, 2, 99] });
+            expect(room.state.seatOrder).toEqual(before);
+        });
+
+        it('ignores a seatOrder with duplicate player ids', () => {
+            addPlayers(room, 3);
+            const before = [...room.state.seatOrder];
+            room.bus.emit('lobby:reorder', { senderId: 1, seatOrder: [1, 2, 2] });
+            expect(room.state.seatOrder).toEqual(before);
+        });
+
+        it('does nothing once the game is no longer in lobby phase', () => {
+            addPlayers(room, 3);
+            room.state.phase = 'role-reveal';
+            const before = [...room.state.seatOrder];
+            room.bus.emit('lobby:reorder', { senderId: 1, seatOrder: [3, 2, 1] });
+            expect(room.state.seatOrder).toEqual(before);
+        });
+
+        it('player:join appends to seatOrder and broadcasts the new order', () => {
+            const ws1 = createMockSocket(1);
+            room.addPlayer(1, ws1);
+            const ws2 = createMockSocket(2);
+            room.addPlayer(2, ws2);
+
+            expect(room.state.seatOrder).toEqual([1, 2]);
+            const msg = getMessageOfType(ws1, 'lobby:reordered');
+            expect(msg).toBeDefined();
+            expect(msg.data.seatOrder).toEqual([1, 2]);
+        });
+
+        it('player:leave removes the player from seatOrder', async () => {
+            addPlayers(room, 3);
+            // Direct emit so we don't have to wait for the lobby grace timer.
+            room.bus.emit('player:leave', { playerId: 2 });
+            await Promise.resolve();
+            expect(room.state.seatOrder).toEqual([1, 3]);
         });
     });
 

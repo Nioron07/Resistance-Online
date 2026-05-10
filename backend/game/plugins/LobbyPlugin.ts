@@ -25,10 +25,17 @@ export class LobbyPlugin extends GamePlugin {
                 knownRoles: undefined
             });
 
+            // Append to the canonical seat order; the host can reorder later
+            // via `lobby:reorder`.
+            if (!state.seatOrder.includes(e.playerId)) {
+                state.seatOrder.push(e.playerId);
+            }
+
             if (this.room.host === null) this.room.host = e.playerId;
 
-            this.room.broadcast("player:joined", {playerId: e.playerId, players: state.players.keys().toArray()});
-          
+            this.room.broadcast("player:joined", {playerId: e.playerId, players: [...state.seatOrder]});
+            this.room.broadcast("lobby:reordered", {seatOrder: [...state.seatOrder]});
+
             await DAC.resistance.games.id(meta_data.gameid).playerId(e.playerId).add();
         })
 
@@ -43,12 +50,14 @@ export class LobbyPlugin extends GamePlugin {
             if (!state.players.get(e.playerId)) return;
 
             state.players.delete(e.playerId);
+            state.seatOrder = state.seatOrder.filter(id => id !== e.playerId);
 
             if (this.room.host === e.playerId) {
-                this.room.host = state.players.keys().next().value ?? null;
+                this.room.host = state.seatOrder[0] ?? state.players.keys().next().value ?? null;
             }
 
             this.room.broadcast("player:left", {playerId: e.playerId});
+            this.room.broadcast("lobby:reordered", {seatOrder: [...state.seatOrder]});
 
             await DAC.resistance.games.id(meta_data.gameid).playerId(e.playerId).remove();
 
@@ -66,6 +75,30 @@ export class LobbyPlugin extends GamePlugin {
             }
 
             this.room.broadcast('player:disconnected', {playerId: e.playerId});
+        });
+
+        /**
+         * Host-only seat reorder during the lobby phase. The new `seatOrder`
+         * must be a permutation of the current player set — same size, no
+         * duplicates, no unknown ids. Anything else is silently ignored
+         * (validation already happened at the WS boundary, this is defense
+         * in depth).
+         */
+        bus.on("lobby:reorder", 100, e => {
+            if (state.phase !== 'lobby') return;
+            if (e.senderId !== this.room.host) return;
+
+            const current = state.players;
+            if (e.seatOrder.length !== current.size) return;
+            const seen = new Set<number>();
+            for (const id of e.seatOrder) {
+                if (!current.has(id)) return;
+                if (seen.has(id)) return;
+                seen.add(id);
+            }
+
+            state.seatOrder = [...e.seatOrder];
+            this.room.broadcast("lobby:reordered", {seatOrder: [...state.seatOrder]});
         });
 
         bus.on("game:configure", 999, async (e) => {

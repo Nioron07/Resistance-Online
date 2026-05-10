@@ -23,34 +23,38 @@
         </div>
 
         <p class="r-phase-sub mt-2">
-          {{ game.isHost ? 'You are the host. Player #1 is the starting leader.' : 'Waiting for the host to start…' }}
+          {{
+            game.isHost
+              ? "You are the host. Drag a player onto another to swap their seats."
+              : "Waiting for the host to start…"
+          }}
         </p>
       </header>
 
-      <draggable
-        v-if="game.isHost"
-        v-model="game.playerIds"
-        :animation="200"
-        class="r-player-grid"
-        item-key="id"
-      >
-        <template #item="{ element: id, index }">
-          <div class="r-player-slot">
-            <span class="r-seat-badge tabular-nums" :class="{ 'r-seat-leader': index === 0 }">
-              {{ index === 0 ? '★' : index + 1 }}
-            </span>
+      <!-- Circle of players -->
+      <div ref="circleEl" class="r-circle">
+        <div class="r-circle-center">
+          <v-icon class="r-rotate-icon" icon="mdi-rotate-right" size="large" />
+          <div class="r-rotate-label">LEADER PASSES<br>CLOCKWISE</div>
+        </div>
 
-            <PlayerCard
-              :avatar="game.playerProfiles[id]?.avatar"
-              :selected="index === 0"
-              :username="game.playerProfiles[id]?.username ?? `Player ${id}`"
-            />
-          </div>
-        </template>
-      </draggable>
-
-      <div v-else class="r-player-grid">
-        <div v-for="(id, index) in game.playerIds" :key="id" class="r-player-slot">
+        <div
+          v-for="(id, index) in game.playerIds"
+          :key="id"
+          class="r-circle-slot"
+          :class="{
+            'r-circle-slot-host': game.isHost,
+            'r-circle-slot-dragging': draggingId === id,
+            'r-circle-slot-drop-hover': dragHoverId === id && draggingId !== null && draggingId !== id,
+          }"
+          :draggable="game.isHost"
+          :style="slotStyle(index, game.playerIds.length)"
+          @dragend="onDragEnd"
+          @dragleave="dragHoverId === id ? (dragHoverId = null) : null"
+          @dragover.prevent="dragHoverId = id"
+          @dragstart="onDragStart(id, $event)"
+          @drop.prevent="onDrop(id)"
+        >
           <span class="r-seat-badge tabular-nums" :class="{ 'r-seat-leader': index === 0 }">
             {{ index === 0 ? '★' : index + 1 }}
           </span>
@@ -91,7 +95,6 @@
 <script setup lang="ts">
   import { onUnmounted, ref } from 'vue'
   import { useRoute } from 'vue-router'
-  import draggable from 'vuedraggable'
   import PlayerCard from '@/components/PlayerCard.vue'
   import { useGameStore } from '@/stores/game'
 
@@ -99,14 +102,65 @@
   const game = useGameStore()
   const copied = ref(false)
 
+  /** Drag-and-drop swap state. */
+  const draggingId = ref<number | null>(null)
+  const dragHoverId = ref<number | null>(null)
+
+  /**
+   * Position each player on a circle. Index 0 sits at 12 o'clock and the
+   * sequence proceeds clockwise — matching the in-game leader rotation.
+   * Returns CSS positioning relative to the circle container.
+   */
+  function slotStyle (index: number, total: number): Record<string, string> {
+    if (total === 0) return {}
+    const angle = -Math.PI / 2 + (2 * Math.PI * index) / total
+    const radiusPct = 38 // % of half the container — leaves room for the slot itself
+    const x = 50 + radiusPct * Math.cos(angle)
+    const y = 50 + radiusPct * Math.sin(angle)
+    return {
+      left: `${x}%`,
+      top: `${y}%`,
+      transform: 'translate(-50%, -50%)',
+    }
+  }
+
+  /** Swap two players in the seat order and broadcast the new order. */
+  function swap (a: number, b: number) {
+    if (a === b) return
+    const order = [...game.playerIds]
+    const ai = order.indexOf(a)
+    const bi = order.indexOf(b)
+    if (ai === -1 || bi === -1) return
+    ;[order[ai], order[bi]] = [order[bi]!, order[ai]!]
+    game.reorderSeats(order)
+  }
+
+  function onDragStart (id: number, ev: DragEvent) {
+    if (!game.isHost) return
+    draggingId.value = id
+    ev.dataTransfer?.setData('text/plain', String(id))
+    if (ev.dataTransfer) ev.dataTransfer.effectAllowed = 'move'
+  }
+
+  function onDrop (targetId: number) {
+    if (!game.isHost) return
+    if (draggingId.value === null) return
+    swap(draggingId.value, targetId)
+    draggingId.value = null
+    dragHoverId.value = null
+  }
+
+  function onDragEnd () {
+    draggingId.value = null
+    dragHoverId.value = null
+  }
+
   const tips = [
     'EVERYONE IS LYING TO YOU. Trust no one — not even yourself.',
     'Your vote matters; you never know if it\'s the deciding one.',
     'As a spy, predictability is a death sentence. Vary your behavior.',
     'During role reveal, sync up with fellow spies — a thumbs-up is plenty.',
     'Some missions need 2 fail cards. Coordinate with your spy partner.',
-    'Watch hands during reveal — fidgets give away identities.',
-    'Stay engaged in conversation. Silence is a tell.',
     'Resistance: only spies can play fail. You always play success.',
   ]
 
@@ -147,7 +201,10 @@
   border: 1px solid rgb(var(--v-theme-border)) !important;
   border-radius: 12px;
 }
-.r-phase-header { text-align: center; margin-bottom: 16px; }
+.r-phase-header {
+  text-align: center;
+  margin-bottom: 16px;
+}
 .r-phase-eyebrow {
   font-size: 0.7rem;
   letter-spacing: 0.16em;
@@ -198,17 +255,54 @@
   margin: 0;
 }
 
-.r-player-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
-  max-width: 720px;
-  margin: 0 auto;
-}
-.r-player-slot {
+/* ---------------- Circle ---------------- */
+.r-circle {
   position: relative;
-  cursor: grab;
+  width: 100%;
+  max-width: 560px;
+  margin: 16px auto;
+  /* Square aspect via padding-bottom hack so positioning %ages line up. */
+  padding-bottom: 100%;
+  height: 0;
 }
+.r-circle-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  text-align: center;
+}
+.r-rotate-icon {
+  color: var(--r-resistance);
+  opacity: 0.55;
+}
+.r-rotate-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.16em;
+  color: rgb(var(--v-theme-on-surface-muted));
+  line-height: 1.4;
+}
+
+.r-circle-slot {
+  position: absolute;
+  width: clamp(78px, 22%, 130px);
+  user-select: none;
+  transition: transform 200ms ease-out, filter 200ms ease-out;
+}
+.r-circle-slot-host { cursor: grab; }
+.r-circle-slot-host:active { cursor: grabbing; }
+.r-circle-slot-dragging {
+  opacity: 0.55;
+}
+.r-circle-slot-drop-hover {
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.55));
+}
+
 .r-seat-badge {
   position: absolute;
   top: 4px;
@@ -250,4 +344,18 @@
 .fade-leave-active { transition: opacity 0.4s ease; }
 .fade-enter-from,
 .fade-leave-to { opacity: 0; }
+
+/* ---------------- Mobile breakpoint ---------------- */
+@media (max-width: 540px) {
+  .r-circle {
+    max-width: 360px;
+  }
+  .r-circle-slot {
+    width: clamp(70px, 24%, 100px);
+  }
+  .r-rotate-label {
+    font-size: 0.55rem;
+    letter-spacing: 0.12em;
+  }
+}
 </style>

@@ -16,6 +16,7 @@ const KNOWN_EVENTS: ReadonlySet<keyof ClientEventsBase> = new Set([
     'vote:cast',
     'sus:submit',
     'mission:play-card',
+    'lobby:reorder',
 ]);
 
 export type ValidationResult =
@@ -93,6 +94,12 @@ export function validateClientEvent(event: unknown, data: unknown): ValidationRe
 
         case 'mission:play-card': {
             if (typeof data.card !== 'boolean') return fail('card must be boolean');
+            return ok;
+        }
+
+        case 'lobby:reorder': {
+            if (!isPlayerIdArray(data.seatOrder)) return fail('seatOrder must be PlayerId[]');
+            if (new Set(data.seatOrder).size !== data.seatOrder.length) return fail('seatOrder has duplicate playerIds');
             return ok;
         }
     }
