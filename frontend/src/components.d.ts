@@ -14,6 +14,7 @@ declare module 'vue' {
     AppFooter: typeof import('./components/AppFooter.vue')['default']
     AppNav: typeof import('./components/AppNav.vue')['default']
     BreakdownPanel: typeof import('./components/BreakdownPanel.vue')['default']
+    ContributorCard: typeof import('./components/ContributorCard.vue')['default']
     GameOutcomeChip: typeof import('./components/GameOutcomeChip.vue')['default']
     HelloWorld: typeof import('./components/HelloWorld.vue')['default']
     IndexBadge: typeof import('./components/IndexBadge.vue')['default']
