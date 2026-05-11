@@ -417,13 +417,17 @@ export const useGameStore = defineStore('game', () => {
     playerProfiles.value = profiles
     missionOutcomes.value = [0, 1, 2, 3, 4].map(i => {
       const v = payload.outcome.missionStatuses[i]
-      if (v === true) return 'blue'
-      if (v === false) return 'red'
+      if (v === true) {
+        return 'blue'
+      }
+      if (v === false) {
+        return 'red'
+      }
       return 'transparent'
     })
     winner.value = payload.outcome.winner === 'spies'
       ? 'spies'
-      : payload.outcome.winner === 'resistance' ? 'resistance' : null
+      : (payload.outcome.winner === 'resistance' ? 'resistance' : null)
   }
 
   return {

@@ -39,7 +39,7 @@
           </tr>
 
           <tr v-if="$slots.afterRow" class="side-table-after-row">
-            <td :colspan="columns.length" class="side-table-after-cell">
+            <td class="side-table-after-cell" :colspan="columns.length">
               <slot :index="i" name="afterRow" :row="row" />
             </td>
           </tr>

@@ -94,23 +94,23 @@
   })
 
   /**
-   * EndState is a read-only post-game view served from the metrics
-   * endpoint — it doesn't need a live WS, and opening one against an
-   * already-finished game just produces console errors. Skip the
-   * connect entirely when the child route is EndState; the live phases
-   * (Lobby / TeamSelection / TeamVote / Suspicion / Mission / etc.)
-   * still get a socket.
+   * Read-only post-game views (EndState, Replay) are served from the
+   * metrics / replay endpoints — they don't need a live WS, and opening
+   * one against an already-finished game just produces console errors.
+   * Skip the connect entirely on those routes; the live phases (Lobby /
+   * TeamSelection / TeamVote / Suspicion / Mission / etc.) still get a
+   * socket.
    */
-  const isEndState = computed(() => /\/EndState\/?$/i.test(route.path))
+  const isReadOnlyRoute = computed(() => /\/(EndState|Replay)\/?$/i.test(route.path))
 
   onMounted(() => {
-    if (isEndState.value) return
+    if (isReadOnlyRoute.value) return
     const code = String(route.params.GameID ?? '')
     if (code) game.connect(code)
   })
 
   onUnmounted(() => {
-    if (isEndState.value) return
+    if (isReadOnlyRoute.value) return
     game.disconnect()
   })
 </script>

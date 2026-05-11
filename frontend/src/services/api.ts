@@ -120,6 +120,43 @@ export interface GameMetrics {
   }
 }
 
+export interface GameReplayPlayer {
+  userid: number
+  username: string | null
+  pfp: string | null
+  role: string
+  side: Side
+}
+
+export interface GameReplayRound {
+  roundId: number
+  /** 1..5 — which mission this nomination attempt belongs to. */
+  missionIndex: number
+  /** 1..N — attempt index within the current mission. */
+  nominationAttempt: number
+  leaderUserid: number | null
+  team: number[]
+  countSpiesNominated: number | null
+  votePoll: Record<string, boolean> | null
+  voteStatus: boolean | null
+  missionStatus: boolean | null
+  missionCards: Record<string, 'success' | 'fail'> | null
+  suspicions: Record<string, Record<string, number>> | null
+}
+
+export interface GameReplay {
+  gameid: number
+  startTimestamp: string | null
+  endTimestamp: string | null
+  outcome: {
+    winner: Winner
+    outcomeType: string | null
+    missionStatuses: Array<boolean | null>
+  }
+  players: GameReplayPlayer[]
+  rounds: GameReplayRound[]
+}
+
 interface FetchOptions {
   signal?: AbortSignal
 }
@@ -157,6 +194,10 @@ export function fetchUserGames (userid: number, limit = 50, offset = 0, opts?: F
 
 export function fetchGameMetrics (gameid: number, weighting?: WeightingArg, opts?: FetchOptions): Promise<GameMetrics> {
   return getJson<GameMetrics>(`/api/games/${gameid}/metrics${weightingToQuery(weighting)}`, opts)
+}
+
+export function fetchGameReplay (gameid: number, opts?: FetchOptions): Promise<GameReplay> {
+  return getJson<GameReplay>(`/api/games/${gameid}/replay`, opts)
 }
 
 export function fetchLeaderboard (

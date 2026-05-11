@@ -20,11 +20,12 @@ declare module 'vue-router/auto-routes' {
   export interface RouteNamedMap {
     '/': RouteRecordInfo<'/', '/', Record<never, never>, Record<never, never>>,
     '/About': RouteRecordInfo<'/About', '/About', Record<never, never>, Record<never, never>>,
-    '/Game/[GameID]': RouteRecordInfo<'/Game/[GameID]', '/Game/:GameID', { GameID: ParamValue<true> }, { GameID: ParamValue<false> }, '/Game/[GameID]/EndState' | '/Game/[GameID]/IdentitySelection' | '/Game/[GameID]/Lobby' | '/Game/[GameID]/MissionPhase' | '/Game/[GameID]/SuspicionPhase' | '/Game/[GameID]/TeamSelection' | '/Game/[GameID]/TeamVote'>,
+    '/Game/[GameID]': RouteRecordInfo<'/Game/[GameID]', '/Game/:GameID', { GameID: ParamValue<true> }, { GameID: ParamValue<false> }, '/Game/[GameID]/EndState' | '/Game/[GameID]/IdentitySelection' | '/Game/[GameID]/Lobby' | '/Game/[GameID]/MissionPhase' | '/Game/[GameID]/Replay' | '/Game/[GameID]/SuspicionPhase' | '/Game/[GameID]/TeamSelection' | '/Game/[GameID]/TeamVote'>,
     '/Game/[GameID]/EndState': RouteRecordInfo<'/Game/[GameID]/EndState', '/Game/:GameID/EndState', { GameID: ParamValue<true> }, { GameID: ParamValue<false> }>,
     '/Game/[GameID]/IdentitySelection': RouteRecordInfo<'/Game/[GameID]/IdentitySelection', '/Game/:GameID/IdentitySelection', { GameID: ParamValue<true> }, { GameID: ParamValue<false> }>,
     '/Game/[GameID]/Lobby': RouteRecordInfo<'/Game/[GameID]/Lobby', '/Game/:GameID/Lobby', { GameID: ParamValue<true> }, { GameID: ParamValue<false> }>,
     '/Game/[GameID]/MissionPhase': RouteRecordInfo<'/Game/[GameID]/MissionPhase', '/Game/:GameID/MissionPhase', { GameID: ParamValue<true> }, { GameID: ParamValue<false> }>,
+    '/Game/[GameID]/Replay': RouteRecordInfo<'/Game/[GameID]/Replay', '/Game/:GameID/Replay', { GameID: ParamValue<true> }, { GameID: ParamValue<false> }>,
     '/Game/[GameID]/SuspicionPhase': RouteRecordInfo<'/Game/[GameID]/SuspicionPhase', '/Game/:GameID/SuspicionPhase', { GameID: ParamValue<true> }, { GameID: ParamValue<false> }>,
     '/Game/[GameID]/TeamSelection': RouteRecordInfo<'/Game/[GameID]/TeamSelection', '/Game/:GameID/TeamSelection', { GameID: ParamValue<true> }, { GameID: ParamValue<false> }>,
     '/Game/[GameID]/TeamVote': RouteRecordInfo<'/Game/[GameID]/TeamVote', '/Game/:GameID/TeamVote', { GameID: ParamValue<true> }, { GameID: ParamValue<false> }>,
@@ -54,7 +55,7 @@ declare module 'vue-router/auto-routes' {
       views: never
     }
     'src/pages/Game/[GameID].vue': {
-      routes: '/Game/[GameID]' | '/Game/[GameID]/EndState' | '/Game/[GameID]/IdentitySelection' | '/Game/[GameID]/Lobby' | '/Game/[GameID]/MissionPhase' | '/Game/[GameID]/SuspicionPhase' | '/Game/[GameID]/TeamSelection' | '/Game/[GameID]/TeamVote'
+      routes: '/Game/[GameID]' | '/Game/[GameID]/EndState' | '/Game/[GameID]/IdentitySelection' | '/Game/[GameID]/Lobby' | '/Game/[GameID]/MissionPhase' | '/Game/[GameID]/Replay' | '/Game/[GameID]/SuspicionPhase' | '/Game/[GameID]/TeamSelection' | '/Game/[GameID]/TeamVote'
       views: 'default'
     }
     'src/pages/Game/[GameID]/EndState.vue': {
@@ -71,6 +72,10 @@ declare module 'vue-router/auto-routes' {
     }
     'src/pages/Game/[GameID]/MissionPhase.vue': {
       routes: '/Game/[GameID]/MissionPhase'
+      views: never
+    }
+    'src/pages/Game/[GameID]/Replay.vue': {
+      routes: '/Game/[GameID]/Replay'
       views: never
     }
     'src/pages/Game/[GameID]/SuspicionPhase.vue': {

@@ -33,6 +33,7 @@
       <article class="r-team-card side-resistance">
         <header class="r-team-card-header">
           <h2 class="r-team-title r-team-title-resistance">RESISTANCE</h2>
+
           <span class="r-team-card-meta tabular-nums">
             {{ data.teams.resistance.players.length }} PLAYERS ·
             {{ data.teams.resistance.totalPoints }} PTS
@@ -105,6 +106,7 @@
       <article class="r-team-card side-spy">
         <header class="r-team-card-header">
           <h2 class="r-team-title r-team-title-spy">SPY</h2>
+
           <span class="r-team-card-meta tabular-nums">
             {{ data.teams.spy.players.length }} PLAYERS ·
             {{ data.teams.spy.totalPoints }} PTS
@@ -200,6 +202,16 @@
         MY METRICS
       </v-btn>
 
+      <v-btn
+        class="ml-2"
+        prepend-icon="mdi-play-circle"
+        size="large"
+        variant="tonal"
+        @click="router.push(`/Game/${gameid}/Replay`)"
+      >
+        REPLAY GAME
+      </v-btn>
+
       <v-btn class="ml-2" variant="text" @click="copyShareLink">
         COPY SHARE LINK
       </v-btn>
@@ -253,10 +265,10 @@
   const copied = ref(false)
 
   function sortByPoints (rows: GamePlayerMetrics[]): GamePlayerMetrics[] {
-    return [...rows].sort((a, b) => b.points - a.points || a.userid - b.userid)
+    return rows.toSorted((a, b) => b.points - a.points || a.userid - b.userid)
   }
   const resistanceRows = computed(() => sortByPoints(data.value?.teams.resistance.players ?? []))
-  const spyRows        = computed(() => sortByPoints(data.value?.teams.spy.players ?? []))
+  const spyRows = computed(() => sortByPoints(data.value?.teams.spy.players ?? []))
 
   const endStatePlayerCount = computed(() => {
     const r = data.value?.teams.resistance.players.length ?? 0
@@ -287,7 +299,7 @@
     const base = [
       { key: 'player', label: 'PLAYER', align: 'left' as const },
       { key: 'points', label: 'PTS', align: 'right' as const, width: '70px' },
-      { key: 'delta',  label: 'Δ INDEX', align: 'right' as const, width: '90px' },
+      { key: 'delta', label: 'Δ INDEX', align: 'right' as const, width: '90px' },
       { key: 'missions', label: 'MISSIONS', align: 'right' as const, width: '80px', stackedHide: false },
       { key: 'nominated', label: 'NOMS', align: 'right' as const, width: '70px', stackedHide: true },
       { key: 'led', label: 'LED', align: 'right' as const, width: '60px', stackedHide: true },
@@ -312,7 +324,7 @@
   }
 
   function pointsClass (n: number) {
-    return n > 0 ? 'text-success' : n < 0 ? 'text-error' : ''
+    return n > 0 ? 'text-success' : (n < 0 ? 'text-error' : '')
   }
 
   function formatComplex (v: number | null): string {

@@ -28,33 +28,33 @@
    */
   const LABELS: Record<string, string> = {
     // Voting on a nomination
-    approve_clean_team:                'Approved clean team',
-    approve_dirty_team:                'Approved dirty team',
-    reject_clean_team:                 'Rejected clean team',
-    reject_dirty_team:                 'Rejected dirty team',
+    approve_clean_team: 'Approved clean team',
+    approve_dirty_team: 'Approved dirty team',
+    reject_clean_team: 'Rejected clean team',
+    reject_dirty_team: 'Rejected dirty team',
     // Mission outcome bonus
-    approved_clean_succeeded:          'Clean team you approved succeeded',
-    approved_dirty_failed:             'Dirty team you approved failed',
-    approved_clean_failed:             'Clean team you approved failed',
-    approved_dirty_succeeded:          'Dirty team you approved succeeded',
+    approved_clean_succeeded: 'Clean team you approved succeeded',
+    approved_dirty_failed: 'Dirty team you approved failed',
+    approved_clean_failed: 'Clean team you approved failed',
+    approved_dirty_succeeded: 'Dirty team you approved succeeded',
     // Mission team participation
-    on_team_mission_succeeded:         'On mission — success',
-    on_team_mission_failed:            'On mission — failure',
-    played_fail_card:                  'Played a fail card',
-    played_success_when_failed:        'Played success on a failed mission',
+    on_team_mission_succeeded: 'On mission — success',
+    on_team_mission_failed: 'On mission — failure',
+    played_fail_card: 'Played a fail card',
+    played_success_when_failed: 'Played success on a failed mission',
     // Leadership
-    led_clean_team:                    'Led a clean team',
-    led_dirty_team:                    'Led a dirty team',
-    led_dirty_team_approved:           'Led a dirty team that passed',
+    led_clean_team: 'Led a clean team',
+    led_dirty_team: 'Led a dirty team',
+    led_dirty_team_approved: 'Led a dirty team that passed',
     // Suspicion — active
-    suspicion_correct_per_gamma:       'Correct suspicions',
-    suspicion_incorrect_per_gamma:     'Incorrect suspicions',
+    suspicion_correct_per_gamma: 'Correct suspicions',
+    suspicion_incorrect_per_gamma: 'Incorrect suspicions',
     // Suspicion — passive
-    trusted_by_resistance_per_voter:   'Trusted by resistance',
+    trusted_by_resistance_per_voter: 'Trusted by resistance',
     suspected_by_resistance_per_gamma: 'Suspected by resistance',
     // Game outcome
-    game_won:                          'Game won',
-    game_lost:                         'Game lost',
+    game_won: 'Game won',
+    game_lost: 'Game lost',
   }
 
   function labelFor (key: string): string {

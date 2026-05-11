@@ -5,6 +5,11 @@ interface SeedOptions {
   playerIds?: number[]
   /** If true, set leaderId === myId so amLeader is true. */
   asLeader?: boolean
+  /**
+   * Explicit hostId. Defaults to playerIds[0] (the seed's "you're the host"
+   * convention). The store's isHost derives from this, NOT from seat order.
+   */
+  hostId?: number
   mission?: number
   nominatedTeam?: number[]
   winner?: 'resistance' | 'spies' | null
@@ -26,6 +31,7 @@ export function seedGameStore (opts: SeedOptions = {}) {
   store.playerProfiles = Object.fromEntries(
     playerIds.map(id => [id, { username: `Player ${id}`, avatar: undefined }]),
   )
+  store.hostId = opts.hostId ?? playerIds[0] ?? null
   store.leaderId = opts.asLeader === false ? (playerIds[1] ?? null) : myId
   store.mission = opts.mission ?? 0
   store.nominatedTeam = opts.nominatedTeam ?? []

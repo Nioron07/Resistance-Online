@@ -7,143 +7,153 @@
     </div>
 
     <template v-else>
-    <header class="r-profile-header">
-      <div class="d-flex align-center">
-        <v-avatar v-if="profile?.pfp" class="mr-3" size="56">
-          <v-img :src="profile.pfp" />
-        </v-avatar>
+      <header class="r-profile-header">
+        <div class="d-flex align-center">
+          <v-avatar v-if="profile?.pfp" class="mr-3" size="56">
+            <v-img :src="profile.pfp" />
+          </v-avatar>
 
-        <v-avatar v-else class="mr-3" color="surface-elevated" size="56">
-          <v-icon icon="mdi-account" />
-        </v-avatar>
+          <v-avatar v-else class="mr-3" color="surface-elevated" size="56">
+            <v-icon icon="mdi-account" />
+          </v-avatar>
 
-        <div>
-          <h1 class="r-profile-name">{{ usernameDisplay }}</h1>
+          <div>
+            <h1 class="r-profile-name">{{ usernameDisplay }}</h1>
 
-          <p class="r-profile-meta">
-            <span v-if="metrics">
-              {{ metrics.counts.games }} GAMES · {{ metrics.counts.wins }}W · {{ metrics.counts.losses }}L
-            </span>
-          </p>
+            <p class="r-profile-meta">
+              <span v-if="metrics">
+                {{ metrics.counts.games }} GAMES · {{ metrics.counts.wins }}W · {{ metrics.counts.losses }}L
+              </span>
+            </p>
+          </div>
         </div>
-      </div>
-    </header>
-
-    <!-- Headline indices + lifetime points -->
-    <section class="r-grid-headline">
-      <MetricCard
-        :delta="null"
-        hint="(R + S) / 2"
-        label="P-INDEX"
-        :precision="2"
-        side="neutral"
-        :value="indexBundle?.pIndex ?? null"
-      />
-
-      <MetricCard
-        hint="resistance games"
-        label="R-INDEX"
-        :precision="2"
-        side="resistance"
-        :value="indexBundle?.rIndex ?? null"
-      />
-
-      <MetricCard
-        hint="spy games"
-        label="S-INDEX"
-        :precision="2"
-        side="spy"
-        :value="indexBundle?.sIndex ?? null"
-      />
-
-      <MetricCard
-        color-value-by-sign
-        :hint="lifetimeHint"
-        label="LIFETIME PTS"
-        :precision="0"
-        side="neutral"
-        :value="metrics?.lifetimePoints.total ?? null"
-      />
-    </section>
-
-    <!-- Resistance / Spy split -->
-    <section class="r-grid-split">
-      <v-card class="r-split-card r-card-hover side-resistance pa-5">
-        <h2 class="r-split-title">RESISTANCE</h2>
-
-        <div class="r-split-grid">
-          <MetricCard label="RATE OF SHERLOCK" :precision="3" :value="metrics?.resistance.RoS_L ?? null" />
-          <MetricCard label="RATE OF PURITY" :precision="3" :value="metrics?.resistance.RoP_L ?? null" />
-          <MetricCard color-value-by-sign label="LIFETIME PTS" :precision="0" :value="metrics?.lifetimePoints.resistance ?? null" />
-          <MetricCard label="GAMES" :precision="0" :value="metrics?.counts.gamesAsResistance ?? null" />
-        </div>
-      </v-card>
-
-      <v-card class="r-split-card r-card-hover side-spy pa-5">
-        <h2 class="r-split-title r-split-title-spy">SPY</h2>
-
-        <div class="r-split-grid">
-          <MetricCard label="RATE OF ILLUSION" :precision="3" :value="metrics?.spy.RoI_L ?? null" />
-          <MetricCard label="RATE OF INFILTRATION" :precision="3" :value="metrics?.spy.RoIF_L ?? null" />
-          <MetricCard color-value-by-sign label="LIFETIME PTS" :precision="0" :value="metrics?.lifetimePoints.spy ?? null" />
-          <MetricCard label="GAMES" :precision="0" :value="metrics?.counts.gamesAsSpy ?? null" />
-        </div>
-      </v-card>
-    </section>
-
-    <!-- Game log -->
-    <section class="r-game-log">
-      <header class="r-game-log-header">
-        <h2 class="r-section-title">GAME LOG</h2>
-        <span v-if="gameLog" class="r-section-meta">{{ gameLog.total }} GAMES</span>
       </header>
 
-      <SideTable
-        :columns="logColumns"
-        empty-text="No completed games yet."
-        :rows="gameLog?.rows ?? []"
-        @row-click="(r) => router.push(`/Game/${r.gameid}/EndState`)"
-      >
-        <template #cell.endTimestamp="{ row }">
-          <span class="text-medium-emphasis">{{ formatDate(row.endTimestamp) }}</span>
-        </template>
+      <!-- Headline indices + lifetime points -->
+      <section class="r-grid-headline">
+        <MetricCard
+          :delta="null"
+          hint="(R + S) / 2"
+          label="P-INDEX"
+          :precision="2"
+          side="neutral"
+          :value="indexBundle?.pIndex ?? null"
+        />
 
-        <template #cell.gameid="{ row }">#{{ row.gameid }}</template>
+        <MetricCard
+          hint="resistance games"
+          label="R-INDEX"
+          :precision="2"
+          side="resistance"
+          :value="indexBundle?.rIndex ?? null"
+        />
 
-        <template #cell.side="{ row }">
-          <PlayerRoleTag :role="row.role" side-only />
-        </template>
+        <MetricCard
+          hint="spy games"
+          label="S-INDEX"
+          :precision="2"
+          side="spy"
+          :value="indexBundle?.sIndex ?? null"
+        />
 
-        <template #cell.points="{ row }">
-          <span class="tabular-nums" :class="row.points > 0 ? 'text-success' : row.points < 0 ? 'text-error' : ''">
-            {{ row.points > 0 ? '+' : '' }}{{ row.points }}
-          </span>
-        </template>
+        <MetricCard
+          color-value-by-sign
+          :hint="lifetimeHint"
+          label="LIFETIME PTS"
+          :precision="0"
+          side="neutral"
+          :value="metrics?.lifetimePoints.total ?? null"
+        />
+      </section>
 
-        <template #cell.won="{ row }">
-          <span :class="row.won ? 'text-success' : 'text-error'">
-            {{ row.won === null ? '—' : row.won ? 'WIN' : 'LOSS' }}
-          </span>
-        </template>
+      <!-- Resistance / Spy split -->
+      <section class="r-grid-split">
+        <v-card class="r-split-card r-card-hover side-resistance pa-5">
+          <h2 class="r-split-title">RESISTANCE</h2>
 
-        <template #cell.missions="{ row }">
-          <MissionTracker dense :outcomes="row.missionStatuses" :player-count="row.playerCount" />
-        </template>
-      </SideTable>
+          <div class="r-split-grid">
+            <MetricCard label="RATE OF SHERLOCK" :precision="3" :value="metrics?.resistance.RoS_L ?? null" />
+            <MetricCard label="RATE OF PURITY" :precision="3" :value="metrics?.resistance.RoP_L ?? null" />
+            <MetricCard color-value-by-sign label="LIFETIME PTS" :precision="0" :value="metrics?.lifetimePoints.resistance ?? null" />
+            <MetricCard label="GAMES" :precision="0" :value="metrics?.counts.gamesAsResistance ?? null" />
+          </div>
+        </v-card>
 
-      <div class="r-game-log-footer">
-        <v-btn
-          v-if="hasMore"
-          :loading="loadingMore"
-          variant="text"
-          @click="loadMore"
+        <v-card class="r-split-card r-card-hover side-spy pa-5">
+          <h2 class="r-split-title r-split-title-spy">SPY</h2>
+
+          <div class="r-split-grid">
+            <MetricCard label="RATE OF ILLUSION" :precision="3" :value="metrics?.spy.RoI_L ?? null" />
+            <MetricCard label="RATE OF INFILTRATION" :precision="3" :value="metrics?.spy.RoIF_L ?? null" />
+            <MetricCard color-value-by-sign label="LIFETIME PTS" :precision="0" :value="metrics?.lifetimePoints.spy ?? null" />
+            <MetricCard label="GAMES" :precision="0" :value="metrics?.counts.gamesAsSpy ?? null" />
+          </div>
+        </v-card>
+      </section>
+
+      <!-- Game log -->
+      <section class="r-game-log">
+        <header class="r-game-log-header">
+          <h2 class="r-section-title">GAME LOG</h2>
+          <span v-if="gameLog" class="r-section-meta">{{ gameLog.total }} GAMES</span>
+        </header>
+
+        <SideTable
+          :columns="logColumns"
+          empty-text="No completed games yet."
+          :rows="gameLog?.rows ?? []"
+          @row-click="(r) => router.push(`/Game/${r.gameid}/EndState`)"
         >
-          LOAD MORE
-        </v-btn>
-      </div>
-    </section>
+          <template #cell.endTimestamp="{ row }">
+            <span class="text-medium-emphasis">{{ formatDate(row.endTimestamp) }}</span>
+          </template>
 
-    <div v-if="error" class="r-error">{{ error }}</div>
+          <template #cell.gameid="{ row }">#{{ row.gameid }}</template>
+
+          <template #cell.side="{ row }">
+            <PlayerRoleTag :role="row.role" side-only />
+          </template>
+
+          <template #cell.points="{ row }">
+            <span class="tabular-nums" :class="row.points > 0 ? 'text-success' : row.points < 0 ? 'text-error' : ''">
+              {{ row.points > 0 ? '+' : '' }}{{ row.points }}
+            </span>
+          </template>
+
+          <template #cell.won="{ row }">
+            <span :class="row.won ? 'text-success' : 'text-error'">
+              {{ row.won === null ? '—' : row.won ? 'WIN' : 'LOSS' }}
+            </span>
+          </template>
+
+          <template #cell.missions="{ row }">
+            <MissionTracker dense :outcomes="row.missionStatuses" :player-count="row.playerCount" />
+          </template>
+
+          <template #cell.replay="{ row }">
+            <v-btn
+              density="compact"
+              icon="mdi-play-circle"
+              size="small"
+              variant="text"
+              @click.stop="router.push(`/Game/${row.gameid}/Replay`)"
+            />
+          </template>
+        </SideTable>
+
+        <div class="r-game-log-footer">
+          <v-btn
+            v-if="hasMore"
+            :loading="loadingMore"
+            variant="text"
+            @click="loadMore"
+          >
+            LOAD MORE
+          </v-btn>
+        </div>
+      </section>
+
+      <div v-if="error" class="r-error">{{ error }}</div>
     </template>
   </v-container>
 </template>
@@ -197,6 +207,7 @@
     { key: 'points', label: 'POINTS', align: 'right' as const, width: '90px' },
     { key: 'won', label: 'RESULT', align: 'left' as const, width: '90px' },
     { key: 'missions', label: 'MISSIONS', align: 'left' as const },
+    { key: 'replay', label: '', align: 'right' as const, width: '40px', stackedHide: true },
   ]
 
   const hasMore = computed(() => {

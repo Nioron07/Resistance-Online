@@ -15,13 +15,13 @@ describe('Game Store', () => {
     expect(game.playerCount).toBe(game.playerIds.length)
   })
 
-  it('isHost is true for the first player in playerIds', () => {
-    const game = seedGameStore({ myId: 7, playerIds: [7, 8, 9, 10, 11] })
+  it('isHost is true when myId matches hostId', () => {
+    const game = seedGameStore({ myId: 7, playerIds: [7, 8, 9, 10, 11], hostId: 7 })
     expect(game.isHost).toBe(true)
   })
 
-  it('isHost is false for non-first players', () => {
-    const game = seedGameStore({ myId: 8, playerIds: [7, 8, 9, 10, 11] })
+  it('isHost is false when myId does not match hostId', () => {
+    const game = seedGameStore({ myId: 8, playerIds: [7, 8, 9, 10, 11], hostId: 7 })
     expect(game.isHost).toBe(false)
   })
 

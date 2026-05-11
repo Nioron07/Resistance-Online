@@ -60,6 +60,7 @@
     <div v-if="loading && rows.length > 0" class="r-status text-medium-emphasis">
       <v-progress-circular indeterminate size="14" width="2" /> updating…
     </div>
+
     <div v-if="error" class="r-status text-error">{{ error }}</div>
   </v-container>
 </template>
