@@ -67,7 +67,7 @@ describe('Metrics', () => {
         it('returns all nulls when there are no rounds', () => {
             const result = computeMetrics('1', []);
             expect(result.resistance.RoS_L).toBeNull();
-            expect(result.resistance.RoCD_L).toBeNull();
+            expect(result.resistance.RoP_L).toBeNull();
             expect(result.spy.RoI_L).toBeNull();
             expect(result.spy.RoIF_L).toBeNull();
         });
@@ -154,7 +154,7 @@ describe('Metrics', () => {
             expect(counts.gamesAsResistance).toBe(0);
             expect(counts.gamesAsSpy).toBe(0);
             expect(resistance.RoS_L).toBeNull();
-            expect(resistance.RoCD_L).toBeNull();
+            expect(resistance.RoP_L).toBeNull();
             expect(spy.RoI_L).toBeNull();
             expect(spy.RoIF_L).toBeNull();
         });
@@ -265,8 +265,8 @@ describe('Metrics', () => {
         });
     });
 
-    describe('RoCD_L - Lifetime Rate of CD', () => {
-        it('maximum RoCD: leader proposes all spies', () => {
+    describe('RoP_L - Lifetime Rate of Purity', () => {
+        it('minimum RoP: leader proposes all spies', () => {
             const rounds = [
                 makeRound({
                     game_id: 1,
@@ -276,11 +276,11 @@ describe('Metrics', () => {
                     mission_participent_userids: ['4', '5'],
                 }),
             ];
-            const {RoCD_L} = computeMetrics('1', rounds).resistance;
-            expect(RoCD_L).toBeCloseTo(1.0);
+            const {RoP_L} = computeMetrics('1', rounds).resistance;
+            expect(RoP_L).toBeCloseTo(0.0);
         });
 
-        it('minimum RoCD: leader proposes no spies', () => {
+        it('maximum RoP: leader proposes no spies', () => {
             const rounds = [
                 makeRound({
                     game_id: 1,
@@ -290,8 +290,8 @@ describe('Metrics', () => {
                     mission_participent_userids: ['2', '3'],
                 }),
             ];
-            const {RoCD_L} = computeMetrics('1', rounds).resistance;
-            expect(RoCD_L).toBeCloseTo(0.0);
+            const {RoP_L} = computeMetrics('1', rounds).resistance;
+            expect(RoP_L).toBeCloseTo(1.0);
         });
 
         it('returns null when user only led the first round (excluded by definition)', () => {
@@ -304,11 +304,11 @@ describe('Metrics', () => {
                     mission_participent_userids: ['4', '5'],
                 }),
             ];
-            const {RoCD_L} = computeMetrics('1', rounds).resistance;
-            expect(RoCD_L).toBeNull();
+            const {RoP_L} = computeMetrics('1', rounds).resistance;
+            expect(RoP_L).toBeNull();
         });
 
-        it('averages s/t across multiple leader rounds', () => {
+        it('averages (t-s)/t across multiple leader rounds', () => {
             const rounds = [
                 makeRound({
                     game_id: 1,
@@ -325,8 +325,10 @@ describe('Metrics', () => {
                     mission_participent_userids: ['2', '3', '4'],
                 }),
             ];
-            const {RoCD_L} = computeMetrics('1', rounds).resistance;
-            expect(RoCD_L).toBeCloseTo(5 / 12);
+            // Round 1: 1 clean of 2 → 1/2.  Round 2: 2 clean of 3 → 2/3.
+            // Average = (1/2 + 2/3) / 2 = 7/12.
+            const {RoP_L} = computeMetrics('1', rounds).resistance;
+            expect(RoP_L).toBeCloseTo(7 / 12);
         });
 
         it('returns null when user was never a leader', () => {
@@ -339,8 +341,8 @@ describe('Metrics', () => {
                     mission_participent_userids: ['1', '4'],
                 }),
             ];
-            const {RoCD_L} = computeMetrics('1', rounds).resistance;
-            expect(RoCD_L).toBeNull();
+            const {RoP_L} = computeMetrics('1', rounds).resistance;
+            expect(RoP_L).toBeNull();
         });
     });
 
@@ -524,7 +526,7 @@ describe('Metrics', () => {
             ];
             const result = computeMetrics('1', rounds);
             expect(result.resistance.RoS_L).toBeNull();
-            expect(result.resistance.RoCD_L).toBeNull();
+            expect(result.resistance.RoP_L).toBeNull();
             expect(result.spy.RoIF_L).not.toBeNull();
         });
 

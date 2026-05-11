@@ -33,6 +33,11 @@ function makePayload (winner: 'resistance' | 'spies' | null): api.GameMetrics {
             points: 8, breakdown: { approve_clean_team: 1, game_won: 5 },
             catalogVersion: '2',
             complexMetric: { key: 'RoS_G', value: 0.5 },
+            stats: {
+              timesNominated: 2, missionsParticipated: 1, timesLed: 1,
+              timesApproved: 3, timesRejected: 1,
+              successCardsPlayed: 1, failCardsPlayed: 0,
+            },
             indexBefore: { rIndex: 4, sIndex: null, pIndex: 4 },
             indexAfter: { rIndex: 6, sIndex: null, pIndex: 6 },
             indexDelta: { rIndex: 2, sIndex: null, pIndex: 2 },
@@ -47,6 +52,11 @@ function makePayload (winner: 'resistance' | 'spies' | null): api.GameMetrics {
             points: -5, breakdown: { reject_dirty_team: -3, game_lost: -5 },
             catalogVersion: '2',
             complexMetric: { key: 'RoI_G', value: 0.3 },
+            stats: {
+              timesNominated: 3, missionsParticipated: 2, timesLed: 0,
+              timesApproved: 2, timesRejected: 2,
+              successCardsPlayed: 0, failCardsPlayed: 2,
+            },
             indexBefore: { rIndex: null, sIndex: 2, pIndex: 2 },
             indexAfter: { rIndex: null, sIndex: 0, pIndex: 0 },
             indexDelta: { rIndex: null, sIndex: -2, pIndex: -2 },

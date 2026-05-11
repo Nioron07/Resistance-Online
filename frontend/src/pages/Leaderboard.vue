@@ -17,7 +17,13 @@
       </button>
     </div>
 
+    <div v-if="loading && rows.length === 0" class="r-loading">
+      <v-progress-circular color="primary" indeterminate size="42" width="3" />
+      <span class="r-loading-text">Loading leaderboard…</span>
+    </div>
+
     <SideTable
+      v-else
       :columns="columns"
       empty-text="Not enough games yet — play more to populate the board."
       :row-class="rowClass"
@@ -51,7 +57,9 @@
       </template>
     </SideTable>
 
-    <div v-if="loading" class="r-status text-medium-emphasis">Loading…</div>
+    <div v-if="loading && rows.length > 0" class="r-status text-medium-emphasis">
+      <v-progress-circular indeterminate size="14" width="2" /> updating…
+    </div>
     <div v-if="error" class="r-status text-error">{{ error }}</div>
   </v-container>
 </template>
@@ -181,5 +189,26 @@
 .r-rank-3 { background-color: rgba(180, 83,  9,  0.18); color: #d97706; }
 .r-row-podium { /* hover affordance only — color comes from rank badge */ }
 
-.r-status { text-align: center; padding: 16px; font-size: 0.875rem; }
+.r-status {
+  text-align: center;
+  padding: 16px;
+  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.r-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 64px 12px;
+  color: rgb(var(--v-theme-on-surface-muted));
+}
+.r-loading-text {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 </style>

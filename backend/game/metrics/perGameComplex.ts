@@ -11,9 +11,9 @@ import { SPY_ROLES } from '../../routes/api/users/_userid/metrics/index.js';
  *            How well this player flew under the radar during this game.
  *
  * Notes:
- *  - RoS_L / RoCD_L / RoI_L / RoIF_L are LIFETIME and live in the existing
+ *  - RoS_L / RoP_L / RoI_L / RoIF_L are LIFETIME and live in the existing
  *    `/api/users/:userid/metrics` endpoint. The whitepaper explicitly notes
- *    that game-level RoCD and RoIF are uninteresting (sample size of 1ish),
+ *    that game-level RoP and RoIF are uninteresting (sample size of 1ish),
  *    so we don't expose them per-game.
  *  - Both functions return null when the player isn't on the right side
  *    or never voted / was never targeted.

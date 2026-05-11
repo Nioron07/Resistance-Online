@@ -1,5 +1,12 @@
 <template>
   <v-container class="r-profile" max-width="1200">
+    <!-- Initial-load spinner — shown only when no data has arrived yet. -->
+    <div v-if="loading && !metrics" class="r-loading">
+      <v-progress-circular color="primary" indeterminate size="42" width="3" />
+      <span class="r-loading-text">Loading player metrics…</span>
+    </div>
+
+    <template v-else>
     <header class="r-profile-header">
       <div class="d-flex align-center">
         <v-avatar v-if="profile?.pfp" class="mr-3" size="56">
@@ -65,8 +72,8 @@
         <h2 class="r-split-title">RESISTANCE</h2>
 
         <div class="r-split-grid">
-          <MetricCard hint="rate of sherlock" label="RoS_L" :precision="3" :value="metrics?.resistance.RoS_L ?? null" />
-          <MetricCard hint="rate of CD" label="RoCD_L" :precision="3" :value="metrics?.resistance.RoCD_L ?? null" />
+          <MetricCard label="RATE OF SHERLOCK" :precision="3" :value="metrics?.resistance.RoS_L ?? null" />
+          <MetricCard label="RATE OF PURITY" :precision="3" :value="metrics?.resistance.RoP_L ?? null" />
           <MetricCard color-value-by-sign label="LIFETIME PTS" :precision="0" :value="metrics?.lifetimePoints.resistance ?? null" />
           <MetricCard label="GAMES" :precision="0" :value="metrics?.counts.gamesAsResistance ?? null" />
         </div>
@@ -76,8 +83,8 @@
         <h2 class="r-split-title r-split-title-spy">SPY</h2>
 
         <div class="r-split-grid">
-          <MetricCard hint="rate of illusion" label="RoI_L" :precision="3" :value="metrics?.spy.RoI_L ?? null" />
-          <MetricCard hint="rate of infiltration" label="RoIF_L" :precision="3" :value="metrics?.spy.RoIF_L ?? null" />
+          <MetricCard label="RATE OF ILLUSION" :precision="3" :value="metrics?.spy.RoI_L ?? null" />
+          <MetricCard label="RATE OF INFILTRATION" :precision="3" :value="metrics?.spy.RoIF_L ?? null" />
           <MetricCard color-value-by-sign label="LIFETIME PTS" :precision="0" :value="metrics?.lifetimePoints.spy ?? null" />
           <MetricCard label="GAMES" :precision="0" :value="metrics?.counts.gamesAsSpy ?? null" />
         </div>
@@ -137,6 +144,7 @@
     </section>
 
     <div v-if="error" class="r-error">{{ error }}</div>
+    </template>
   </v-container>
 </template>
 
@@ -172,6 +180,7 @@
   const indexBundle = ref<UserIndex | null>(null)
   const gameLog = ref<UserGameLog | null>(null)
 
+  const loading = ref(true)
   const loadingMore = ref(false)
   const error = ref('')
 
@@ -260,16 +269,21 @@
   }
 
   async function init () {
-    const id = await resolveUserid(usernameRaw.value)
-    if (id === null) {
-      error.value = `No player found for "${usernameRaw.value}"`
-      return
+    loading.value = true
+    try {
+      const id = await resolveUserid(usernameRaw.value)
+      if (id === null) {
+        error.value = `No player found for "${usernameRaw.value}"`
+        return
+      }
+      userid.value = id
+      if (appStore.user?.id === id) {
+        profile.value = { pfp: appStore.user?.pfp ?? null }
+      }
+      await loadAll(id)
+    } finally {
+      loading.value = false
     }
-    userid.value = id
-    if (appStore.user?.id === id) {
-      profile.value = { pfp: appStore.user?.pfp ?? null }
-    }
-    await loadAll(id)
   }
 
   watch(() => usernameRaw.value, init)
@@ -347,5 +361,19 @@
   text-align: center;
   color: var(--r-spy);
   font-size: 0.875rem;
+}
+.r-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 64px 12px;
+  color: rgb(var(--v-theme-on-surface-muted));
+}
+.r-loading-text {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 </style>

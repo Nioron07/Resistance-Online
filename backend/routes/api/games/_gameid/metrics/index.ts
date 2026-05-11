@@ -97,6 +97,26 @@ interface IndexTriple {
     pIndex: number | null;
 }
 
+/**
+ * "Simple" per-game stats derived from the per-round table. These are
+ * counts, not ratios — they're cheap to compute and make the EndState
+ * useful even when the complex metric is null.
+ */
+interface PerPlayerStats {
+    /** Times this player was named on a nomination (proposed for a mission). */
+    timesNominated:       number;
+    /** Times this player actually went on a mission (nomination approved). */
+    missionsParticipated: number;
+    /** Times this player led a nomination. */
+    timesLed:             number;
+    /** Approve / reject vote counts on nominations. */
+    timesApproved:        number;
+    timesRejected:        number;
+    /** Mission cards this player played (post-mission_cards migration). */
+    successCardsPlayed:   number;
+    failCardsPlayed:      number;
+}
+
 interface PerPlayer {
     userid: number;
     username: string | null;
@@ -108,9 +128,51 @@ interface PerPlayer {
     catalogVersion: string;
     /** Per-game complex metric: RoS_G if resistance, RoI_G if spy. Null if not applicable. */
     complexMetric: { key: 'RoS_G' | 'RoI_G'; value: number | null };
+    stats: PerPlayerStats;
     indexBefore: IndexTriple;
     indexAfter:  IndexTriple;
     indexDelta:  IndexTriple;
+}
+
+function computePerPlayerStats(userid: string, rounds: MetricsRow[]): PerPlayerStats {
+    let timesNominated = 0;
+    let missionsParticipated = 0;
+    let timesLed = 0;
+    let timesApproved = 0;
+    let timesRejected = 0;
+    let successCardsPlayed = 0;
+    let failCardsPlayed = 0;
+
+    for (const r of rounds) {
+        // Leadership
+        if (r.leader_userid !== null && String(r.leader_userid) === userid) {
+            timesLed++;
+        }
+        // Team participation
+        const team = (r.mission_participent_userids ?? []).map(String);
+        if (team.includes(userid)) {
+            timesNominated++;
+            if (r.vote_status === true) missionsParticipated++;
+        }
+        // Vote ballot — only counted when the row actually has poll data.
+        const vote = r.vote_poll?.[userid];
+        if (vote === true)  timesApproved++;
+        else if (vote === false) timesRejected++;
+        // Mission cards (only present on approved-then-played rounds).
+        const card = r.mission_cards?.[userid];
+        if (card === 'success') successCardsPlayed++;
+        else if (card === 'fail') failCardsPlayed++;
+    }
+
+    return {
+        timesNominated,
+        missionsParticipated,
+        timesLed,
+        timesApproved,
+        timesRejected,
+        successCardsPlayed,
+        failCardsPlayed,
+    };
 }
 
 export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: FastifyReply) => {
@@ -183,6 +245,7 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
                 breakdown: row.breakdown,
                 catalogVersion: row.catalog_version,
                 complexMetric,
+                stats: computePerPlayerStats(String(userid), roundsRows),
                 indexBefore: pickTriple(before),
                 indexAfter:  pickTriple(after),
                 indexDelta:  triplDelta(pickTriple(before), pickTriple(after)),

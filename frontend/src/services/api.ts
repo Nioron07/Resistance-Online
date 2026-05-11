@@ -37,7 +37,7 @@ export interface UserMetrics {
     gamesAsSpy: number
   }
   lifetimePoints: { resistance: number, spy: number, total: number }
-  resistance: { RoS_L: number | null, RoCD_L: number | null }
+  resistance: { RoS_L: number | null, RoP_L: number | null }
   spy: { RoI_L: number | null, RoIF_L: number | null }
 }
 
@@ -75,6 +75,16 @@ export interface Leaderboard {
   rows: LeaderboardEntry[]
 }
 
+export interface GamePlayerStats {
+  timesNominated: number
+  missionsParticipated: number
+  timesLed: number
+  timesApproved: number
+  timesRejected: number
+  successCardsPlayed: number
+  failCardsPlayed: number
+}
+
 export interface GamePlayerMetrics {
   userid: number
   username: string | null
@@ -85,6 +95,7 @@ export interface GamePlayerMetrics {
   breakdown: Record<string, number>
   catalogVersion: string
   complexMetric: { key: 'RoS_G' | 'RoI_G', value: number | null }
+  stats: GamePlayerStats
   indexBefore: IndexTriple
   indexAfter: IndexTriple
   indexDelta: IndexTriple

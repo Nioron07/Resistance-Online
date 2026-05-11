@@ -387,6 +387,45 @@ export const useGameStore = defineStore('game', () => {
     socket.send('lobby:reorder', { seatOrder: [...seatOrder] })
   }
 
+  /**
+   * Hydrate the store from a historical metrics payload for the EndState
+   * read-only view. No socket involved — just enough state for the
+   * surrounding [GameID] layout (player count, spies/resistance counts,
+   * mission tracker, phase label) to render correctly against an
+   * already-finished game.
+   */
+  function loadFromMetrics (payload: {
+    gameid: number | string
+    teams: {
+      resistance: { players: Array<{ userid: number, username: string | null, pfp: string | null }> }
+      spy: { players: Array<{ userid: number, username: string | null, pfp: string | null }> }
+    }
+    outcome: { winner: 'resistance' | 'spies' | null, missionStatuses: Array<boolean | null> }
+  }) {
+    joinCode.value = String(payload.gameid)
+    phase.value = 'game-over'
+    const ids: PlayerId[] = []
+    const profiles: Record<PlayerId, PlayerProfile> = {}
+    for (const p of [...payload.teams.resistance.players, ...payload.teams.spy.players]) {
+      ids.push(p.userid)
+      profiles[p.userid] = {
+        username: p.username ?? `Player ${p.userid}`,
+        avatar: p.pfp ?? undefined,
+      }
+    }
+    playerIds.value = ids
+    playerProfiles.value = profiles
+    missionOutcomes.value = [0, 1, 2, 3, 4].map(i => {
+      const v = payload.outcome.missionStatuses[i]
+      if (v === true) return 'blue'
+      if (v === false) return 'red'
+      return 'transparent'
+    })
+    winner.value = payload.outcome.winner === 'spies'
+      ? 'spies'
+      : payload.outcome.winner === 'resistance' ? 'resistance' : null
+  }
+
   return {
     // identity
     myId,
@@ -406,5 +445,6 @@ export const useGameStore = defineStore('game', () => {
     // actions
     connect, disconnect,
     startGame, submitRole, submitNomination, castVote, submitSuspicions, playMissionCard, reorderSeats,
+    loadFromMetrics,
   }
 })

@@ -39,7 +39,11 @@ export interface MetricsRow {
 /**
  * Returns per-round data needed for:
  *   - RoS  (Rate of Sherlock) - suspicion records submitted *by* this player
- *   - RoCD (Rate of "CD") - rounds where this player was leader, excluding round 0
+ *   - RoP (Rate of Purity) - rounds where this player was leader, excluding round 0.
+ *     Fraction of proposed teammates who turned out to be RESISTANCE (i.e. clean),
+ *     averaged over all non-first rounds the player led. Higher is better:
+ *     1.0 means you never put a spy on a team you led; 0.0 means every teammate
+ *     was a spy.
  *   - RoI  (Rate of Illusion) - suspicion records targeting this player + spy count
  *   - RoIF (Rate of Infiltration) - mission_participent_userids & vote_status
  *   - Game counts - total games, wins, losses, games as spy/resistance
@@ -110,11 +114,11 @@ interface ComplexMetrics {
         RoS_L: number | null;
 
         /**
-         * Lifetime Rate of "CD".
+         * Lifetime Rate of Purity.
          * Fraction of spies this player put on their proposed teams while leading (excl. first round).
          * null when the player has never led a non-first round.
          */
-        RoCD_L: number | null;
+        RoP_L: number | null;
     };
     spy: {
         /**
@@ -146,8 +150,8 @@ export function computeMetrics(
     let RoS_G_sum = 0;
     let RoS_game_count = 0;
 
-    let RoCD_numerator = 0;
-    let RoCD_denominator = 0;
+    let RoP_numerator = 0;
+    let RoP_denominator = 0;
 
 
     const roiByGame = new Map<number, {spyCount: number; totalR: number; userWeightedSum: number}>();
@@ -205,7 +209,7 @@ export function computeMetrics(
             }
         }
 
-        // RoCD
+        // RoP
         if (!userIsSpy) {
             for (const row of gameRounds) {
                 if (String(row.leader_userid) !== userid) continue;
@@ -220,8 +224,11 @@ export function computeMetrics(
                     return role !== null && SPY_ROLES.has(role);
                 }).length;
 
-                RoCD_numerator += s / t;
-                RoCD_denominator++;
+                // Purity = fraction of teammates who were CLEAN
+                // (resistance). Higher is better — 1.0 means you never
+                // proposed a spy; 0.0 means every teammate was a spy.
+                RoP_numerator += (t - s) / t;
+                RoP_denominator++;
             }
         }
 
@@ -289,7 +296,7 @@ export function computeMetrics(
         },
         resistance: {
             RoS_L: RoS_game_count > 0 ? RoS_G_sum / RoS_game_count : null,
-            RoCD_L: RoCD_denominator > 0 ? RoCD_numerator / RoCD_denominator : null,
+            RoP_L: RoP_denominator > 0 ? RoP_numerator / RoP_denominator : null,
         },
         spy: {
             RoI_L,
@@ -371,7 +378,7 @@ export const get_opts = {
                         type: 'object',
                         properties: {
                             RoS_L:  {type: ['number', 'null'], description: 'Lifetime Rate of Sherlock. null if never voted as Resistance'},
-                            RoCD_L: {type: ['number', 'null'], description: 'Lifetime Rate of CD. null if never led a non-first round'},
+                            RoP_L: {type: ['number', 'null'], description: 'Lifetime Rate of Purity. null if never led a non-first round'},
                         }
                     },
                     spy: {
