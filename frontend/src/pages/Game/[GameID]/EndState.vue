@@ -54,7 +54,8 @@
         <SideTable
           :columns="columns"
           empty-text="No resistance metrics."
-          :rows="data?.teams.resistance.players ?? []"
+          :row-class="(r) => r.userid === myUserid ? 'side-row-me' : ''"
+          :rows="resistanceRows"
         >
           <template #cell.player="{ row }">
             <PlayerCell :avatar="row.pfp" :role="row.role" :username="row.username ?? `#${row.userid}`" />
@@ -77,20 +78,20 @@
           <template #cell.breakdown="{ row }">
             <v-btn
               density="compact"
-              icon="mdi-chevron-down"
+              :icon="expandedPlayer === row.userid ? 'mdi-chevron-up' : 'mdi-chevron-down'"
               size="x-small"
               variant="text"
               @click.stop="toggleBreakdown(row.userid)"
             />
           </template>
-        </SideTable>
 
-        <BreakdownPanel
-          v-for="p in data?.teams.resistance.players ?? []"
-          v-show="expandedPlayer === p.userid"
-          :key="`${p.userid}-bd`"
-          :breakdown="p.breakdown"
-        />
+          <template #afterRow="{ row }">
+            <BreakdownPanel
+              v-if="expandedPlayer === row.userid"
+              :breakdown="row.breakdown"
+            />
+          </template>
+        </SideTable>
       </article>
 
       <article
@@ -102,7 +103,8 @@
         <SideTable
           :columns="columns"
           empty-text="No spy metrics."
-          :rows="data?.teams.spy.players ?? []"
+          :row-class="(r) => r.userid === myUserid ? 'side-row-me' : ''"
+          :rows="spyRows"
         >
           <template #cell.player="{ row }">
             <PlayerCell :avatar="row.pfp" :role="row.role" :username="row.username ?? `#${row.userid}`" />
@@ -125,20 +127,20 @@
           <template #cell.breakdown="{ row }">
             <v-btn
               density="compact"
-              icon="mdi-chevron-down"
+              :icon="expandedPlayer === row.userid ? 'mdi-chevron-up' : 'mdi-chevron-down'"
               size="x-small"
               variant="text"
               @click.stop="toggleBreakdown(row.userid)"
             />
           </template>
-        </SideTable>
 
-        <BreakdownPanel
-          v-for="p in data?.teams.spy.players ?? []"
-          v-show="expandedPlayer === p.userid"
-          :key="`${p.userid}-bd`"
-          :breakdown="p.breakdown"
-        />
+          <template #afterRow="{ row }">
+            <BreakdownPanel
+              v-if="expandedPlayer === row.userid"
+              :breakdown="row.breakdown"
+            />
+          </template>
+        </SideTable>
       </article>
     </section>
 
@@ -171,16 +173,30 @@
   import PlayerCell from '@/components/PlayerCell.vue'
   import SideTable from '@/components/SideTable.vue'
   import { fetchGameMetrics, type GameMetrics } from '@/services/api'
+  import { useAppStore } from '@/stores/app'
 
   const route = useRoute()
   const router = useRouter()
   const { smAndDown } = useDisplay()
+  const appStore = useAppStore()
+  const myUserid = computed(() => appStore.user?.id ?? null)
 
   const data = ref<GameMetrics | null>(null)
   const error = ref('')
   const expandedPlayer = ref<number | null>(null)
   const mobileSide = ref<'resistance' | 'spy'>('resistance')
   const copied = ref(false)
+
+  /**
+   * Per-side rows sorted by points descending. Stable secondary sort by
+   * userid so two players with equal points always appear in the same
+   * order across renders (and across the R/S panels).
+   */
+  function sortByPoints<T extends { points: number, userid: number }> (rows: T[]): T[] {
+    return [...rows].sort((a, b) => b.points - a.points || a.userid - b.userid)
+  }
+  const resistanceRows = computed(() => sortByPoints(data.value?.teams.resistance.players ?? []))
+  const spyRows        = computed(() => sortByPoints(data.value?.teams.spy.players ?? []))
 
   const endStatePlayerCount = computed(() => {
     const r = data.value?.teams.resistance.players.length ?? 0
@@ -336,4 +352,15 @@
 }
 
 .r-error { margin-top: 16px; text-align: center; color: var(--r-spy); font-size: 0.875rem; }
+
+/* Highlight the signed-in player's row in both team tables. */
+:deep(.side-row-me) {
+  background-color: rgba(245, 158, 11, 0.08) !important;
+  outline: 1px solid rgba(245, 158, 11, 0.45);
+  outline-offset: -1px;
+}
+:deep(.side-row-card.side-row-me) {
+  border-color: rgba(245, 158, 11, 0.55) !important;
+  background-color: rgba(245, 158, 11, 0.08) !important;
+}
 </style>

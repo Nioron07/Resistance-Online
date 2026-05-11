@@ -22,22 +22,28 @@
           </td>
         </tr>
 
-        <tr
-          v-for="(row, i) in rows"
-          :key="rowKey(row, i)"
-          :class="rowClass(row, i)"
-          @click="handleRowClick(row, i)"
-        >
-          <td
-            v-for="col in columns"
-            :key="col.key"
-            :class="[col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left', col.cellClass]"
+        <template v-for="(row, i) in rows" :key="rowKey(row, i)">
+          <tr
+            :class="rowClass(row, i)"
+            @click="handleRowClick(row, i)"
           >
-            <slot :index="i" :name="`cell.${col.key}`" :row="row">
-              {{ defaultCell(row, col) }}
-            </slot>
-          </td>
-        </tr>
+            <td
+              v-for="col in columns"
+              :key="col.key"
+              :class="[col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left', col.cellClass]"
+            >
+              <slot :index="i" :name="`cell.${col.key}`" :row="row">
+                {{ defaultCell(row, col) }}
+              </slot>
+            </td>
+          </tr>
+
+          <tr v-if="$slots.afterRow" class="side-table-after-row">
+            <td :colspan="columns.length" class="side-table-after-cell">
+              <slot :index="i" name="afterRow" :row="row" />
+            </td>
+          </tr>
+        </template>
       </tbody>
     </table>
 
@@ -47,28 +53,32 @@
         <slot name="empty">{{ emptyText }}</slot>
       </div>
 
-      <div
-        v-for="(row, i) in rows"
-        :key="rowKey(row, i)"
-        class="side-row-card"
-        :class="rowClass(row, i)"
-        @click="handleRowClick(row, i)"
-      >
+      <template v-for="(row, i) in rows" :key="rowKey(row, i)">
         <div
-          v-for="col in columns"
-          :key="col.key"
-          class="side-row-line"
-          :class="col.stackedHide ? 'd-none' : ''"
+          class="side-row-card"
+          :class="rowClass(row, i)"
+          @click="handleRowClick(row, i)"
         >
-          <span class="side-row-label">{{ col.label }}</span>
+          <div
+            v-for="col in columns"
+            :key="col.key"
+            class="side-row-line"
+            :class="col.stackedHide ? 'd-none' : ''"
+          >
+            <span class="side-row-label">{{ col.label }}</span>
 
-          <span class="side-row-value">
-            <slot :index="i" :name="`cell.${col.key}`" :row="row">
-              {{ defaultCell(row, col) }}
-            </slot>
-          </span>
+            <span class="side-row-value">
+              <slot :index="i" :name="`cell.${col.key}`" :row="row">
+                {{ defaultCell(row, col) }}
+              </slot>
+            </span>
+          </div>
         </div>
-      </div>
+
+        <div v-if="$slots.afterRow" class="side-row-after">
+          <slot :index="i" name="afterRow" :row="row" />
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -195,4 +205,11 @@
   text-align: right;
   word-break: break-word;
 }
+
+.side-table-after-row { background-color: transparent; }
+.side-table-after-cell {
+  padding: 0 12px 8px !important;
+  border-bottom: 1px solid rgba(31, 41, 55, 0.5);
+}
+.side-row-after { margin-top: -4px; }
 </style>
