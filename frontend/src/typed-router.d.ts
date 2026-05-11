@@ -33,6 +33,7 @@ declare module 'vue-router/auto-routes' {
     '/Login/Login': RouteRecordInfo<'/Login/Login', '/Login/Login', Record<never, never>, Record<never, never>>,
     '/Login/UserNameSignup': RouteRecordInfo<'/Login/UserNameSignup', '/Login/UserNameSignup', Record<never, never>, Record<never, never>>,
     '/Profile/[Username]': RouteRecordInfo<'/Profile/[Username]', '/Profile/:Username', { Username: ParamValue<true> }, { Username: ParamValue<false> }>,
+    '/Search': RouteRecordInfo<'/Search', '/Search', Record<never, never>, Record<never, never>>,
   }
 
   /**
@@ -104,6 +105,10 @@ declare module 'vue-router/auto-routes' {
     }
     'src/pages/Profile/[Username].vue': {
       routes: '/Profile/[Username]'
+      views: never
+    }
+    'src/pages/Search.vue': {
+      routes: '/Search'
       views: never
     }
   }

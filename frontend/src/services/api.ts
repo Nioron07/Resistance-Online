@@ -208,3 +208,58 @@ export function fetchLeaderboard (
 ): Promise<Leaderboard> {
   return getJson<Leaderboard>(`/api/leaderboard?metric=${metric}&limit=${limit}${weightingToQuery(weighting, '&')}`, opts)
 }
+
+// ---------- Search ----------
+
+export interface PlayerSearchResult {
+  id: number
+  username: string
+  pfp: string | null
+  bio: string | null
+  last_played: string | null
+}
+
+export function searchPlayers (q: string, opts?: FetchOptions): Promise<PlayerSearchResult[]> {
+  return getJson<PlayerSearchResult[]>(`/api/users?q=${encodeURIComponent(q)}`, opts)
+}
+
+export interface GameSearchFilters {
+  q?: string
+  userid?: number
+  before?: string
+  after?: string
+  winner?: 'resistance' | 'spy'
+  outcomeType?: string
+  minPlayers?: number
+  maxPlayers?: number
+  limit?: number
+  offset?: number
+}
+
+export interface GameSearchRow {
+  gameid: number
+  endTimestamp: string
+  startTimestamp: string | null
+  winner: Winner
+  outcomeType: string | null
+  playerCount: number
+  missionStatuses: boolean[]
+  countFailedVotes: number
+}
+
+export interface GameSearch {
+  rows: GameSearchRow[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export function searchGames (f: GameSearchFilters, opts?: FetchOptions): Promise<GameSearch> {
+  const qs = new URLSearchParams()
+  for (const [k, v] of Object.entries(f)) {
+    if (v !== undefined && v !== null && v !== '') {
+      qs.set(k, String(v))
+    }
+  }
+  return getJson<GameSearch>(`/api/games/search?${qs.toString()}`, opts)
+}

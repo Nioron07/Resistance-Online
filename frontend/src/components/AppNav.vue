@@ -41,6 +41,13 @@
         @click="router.push('/Leaderboard')"
       />
 
+      <v-list-item
+        :active="route.path.startsWith('/Search')"
+        prepend-icon="mdi-magnify"
+        title="Search"
+        @click="router.push('/Search')"
+      />
+
       <template v-if="appStore.isAuthenticated">
         <v-list-item
           :active="route.path.startsWith('/Profile')"
@@ -110,6 +117,12 @@
           @click="router.push('/Leaderboard')"
         />
 
+        <v-list-item
+          prepend-icon="mdi-magnify"
+          title="Search"
+          @click="router.push('/Search')"
+        />
+
         <template v-if="appStore.isAuthenticated">
           <v-list-item
             prepend-icon="mdi-chart-bar"
@@ -163,6 +176,7 @@
     const p = route.path
     if (p === '/') return 'Resistance'
     if (p.startsWith('/Leaderboard')) return 'Leaderboard'
+    if (p.startsWith('/Search')) return 'Search'
     if (p.startsWith('/Profile')) return 'My Stats'
     if (p.startsWith('/Game')) return 'Game'
     if (p.startsWith('/Login')) return 'Sign In'

@@ -469,6 +469,27 @@ export abstract class DAC {
         /**
          * @async
          * @function
+         *
+         * Case-insensitive substring search on `username`. Returns the same
+         * column set as verbosity-0 — minimal info sufficient for a search
+         * results list. Results are ordered by relevance (exact match first,
+         * then prefix, then substring) and most-recently-played within each
+         * relevance tier.
+         *
+         * @param { string } q       The substring to match.
+         * @param { number } limit   Max rows to return (caller is expected to clamp).
+         * @returns Promise of an array of matching profiles. Empty when no rows match.
+         * @throws iff the underlying query throws.
+         */
+        async search(q: string, limit: number): Promise<QueryResultRow[]> {
+            const like = `%${q}%`;
+            const prefix = `${q}%`;
+            return await db.queryAll<QueryResultRow>(DAC.queries.users.search, [like, q, prefix, limit]);
+        },
+
+        /**
+         * @async
+         * @function
          * 
          * Creates a new user. Must manually check existance before hand.
          * 
@@ -705,6 +726,24 @@ export abstract class DAC {
                         player_profiles (username, pfp, connections)
                         VALUES          ($1      , $2 , $3         )
                     RETURNING id;`,
+
+            /**
+             * Substring search on username. Boost ranking: exact-match (0),
+             * prefix (1), then plain substring (2). Tiebreak by recency.
+             *
+             * $1 = '%q%' (substring), $2 = q (exact), $3 = 'q%' (prefix),
+             * $4 = limit.
+             */
+            search: `SELECT id, username, pfp, bio, last_played
+                       FROM public.player_profiles
+                      WHERE username ILIKE $1
+                      ORDER BY
+                        CASE WHEN LOWER(username) = LOWER($2) THEN 0
+                             WHEN username ILIKE $3            THEN 1
+                             ELSE                                   2 END,
+                        last_played DESC NULLS LAST,
+                        id ASC
+                      LIMIT $4;`,
             id: {
                 get: [
                     `SELECT

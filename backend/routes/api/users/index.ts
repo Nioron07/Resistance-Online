@@ -8,12 +8,29 @@ type Get = {
     Querystring: {
         verbosity: ProfileVerbosity;
         userids: number[] | string[];
+        /**
+         * Case-insensitive substring search on username. When present,
+         * the verbosity/userids path is bypassed; results are always in
+         * the verbosity-0 shape sufficient for a search UI.
+         */
+        q?: string;
+        /** Result cap for the search path. Ignored when `q` is absent. */
+        limit?: number;
     };
 };
 
 // ------------------- ------------------- Methods ------------------- ------------------- \\
 export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: FastifyReply) => {
     try {
+        // Substring search path — short-circuit before the userids parsing
+        // since q is mutually exclusive with the lookup-by-id flow.
+        if (typeof req.query.q === 'string' && req.query.q.length > 0) {
+            const limit = clampSearchLimit(req.query.limit);
+            const results = await DAC.users.search(req.query.q, limit);
+            rep.code(200).send(results ?? []);
+            return;
+        }
+
         let userids: number[] | string[] | undefined = undefined;
 
         // Check for comma delimted array
@@ -67,6 +84,13 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
 
 }
 
+function clampSearchLimit(raw: unknown): number {
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 1) return 50;
+    if (n > 100) return 100;
+    return Math.floor(n);
+}
+
 // ------------------- ------------------- Inject the Methods into the Route ------------------- ------------------- \\
 export const get_opts = {
     schema: {
@@ -89,6 +113,19 @@ export const get_opts = {
                     },
                     description: 'An array of userids to fetch. When none are supplied, all users will be returned at the selected verbosity level. IDs that are not found will silently fail.',
                     default: []
+                },
+                q: {
+                    type: 'string',
+                    minLength: 1,
+                    maxLength: 64,
+                    description: 'Case-insensitive substring on username. When supplied, takes precedence over verbosity/userids and always returns the verbosity-0 shape.'
+                },
+                limit: {
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 100,
+                    default: 50,
+                    description: 'Max search results returned. Only honored when `q` is present.'
                 }
             }
         }
