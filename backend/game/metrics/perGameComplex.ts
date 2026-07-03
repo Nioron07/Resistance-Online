@@ -74,7 +74,12 @@ export function computeRoI_G(userid: string, rows: MetricsRow[]): number | null 
 
     for (const row of rows) {
         if (!row.suspicions) continue;
-        for (const [, votes] of Object.entries(row.suspicions)) {
+        for (const [voterId, votes] of Object.entries(row.suspicions)) {
+            // RoI measures how well RESISTANCE detects the spy — spy-submitted
+            // records are noise and are dropped at ingest today, but legacy
+            // rows may still carry them. Mirror scorePassiveSuspicion's guard.
+            const voterRole = players[voterId] ?? null;
+            if (voterRole === null || SPY_ROLES.has(voterRole)) continue;
             for (const [targetId, rawGamma] of Object.entries(votes)) {
                 const gamma = clampGamma(rawGamma);
                 if (gamma === 0) continue;

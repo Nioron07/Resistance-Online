@@ -10,9 +10,10 @@
  *   - Mission card played             (per-player Success/Fail; post-migration)
  *   - Leadership                      (proposing clean/dirty teams; bonus when approved)
  *   - Suspicion (active)              (resistance only — spies are dropped server-side)
- *   - Suspicion (passive)             (this is the big new one: each suspicion
- *                                     submitter who OMITS you adds points; each
- *                                     who MARKS you subtracts γ × multiplier).
+ *   - Suspicion (passive)             (averaged across the round's resistance
+ *                                     voters: fully trusted = the catalog value,
+ *                                     marked at γ = γ × multiplier ÷ voters —
+ *                                     so table size doesn't inflate points).
  *   - Game outcome                    (won, lost — both sides)
  *
  * Spy values are larger than their resistance equivalents to keep the
@@ -20,9 +21,12 @@
  *
  * Bump CATALOG_VERSION on any value change and rerun the recompute script
  * to repopulate `player_game_metrics`.
+ *
+ * v3: passive suspicion normalized per voter (was summed per voter, which
+ * scaled with player count and made indices incomparable across game sizes).
  */
 
-export const CATALOG_VERSION = '2' as const;
+export const CATALOG_VERSION = '3' as const;
 
 export const RESISTANCE_ACTION_POINTS = {
     // === Voting on a nomination (one of these always fires per row with a vote) ===
@@ -53,9 +57,13 @@ export const RESISTANCE_ACTION_POINTS = {
     suspicion_incorrect_per_gamma:     -1,
 
     // === Suspicion (passive, against you) ===
-    /** +N for every resistance voter who submitted suspicions and OMITTED you. */
-    trusted_by_resistance_per_voter:   +1,
-    /** ×γ for every resistance voter who included you at confidence γ. */
+    // v3: these are PER-ROUND values, averaged over the round's resistance
+    // voters (key names kept for old-breakdown compatibility). A round where
+    // everyone omitted you = the full trust value; a round where everyone
+    // marked you at γ = γ × the suspicion multiplier.
+    /** Per-round trust value when resistance voters omit you. */
+    trusted_by_resistance_per_voter:   +2,
+    /** ×γ (voter-averaged) when resistance voters mark you at confidence γ. */
     suspected_by_resistance_per_gamma: -1,
 
     // === Game outcome ===
@@ -91,9 +99,12 @@ export const SPY_ACTION_POINTS = {
     led_dirty_team_approved:           +2,
 
     // === Suspicion (passive, against you) — the user's example dynamic ===
-    /** +N for every resistance voter who submitted but DID NOT mark you. */
-    trusted_by_resistance_per_voter:   +3,
-    /** ×γ for every resistance voter who marked you at confidence γ. */
+    // v3 per-round values (voter-averaged; see resistance note). A spy's
+    // fully-trusted round must still clearly outweigh a single bad vote
+    // (reject_dirty −3), hence the larger magnitude.
+    /** Per-round trust value when resistance voters omit you — going undetected is the spy's win condition. */
+    trusted_by_resistance_per_voter:   +5,
+    /** ×γ (voter-averaged) when resistance voters mark you at confidence γ. */
     suspected_by_resistance_per_gamma: -2,
 
     // === Game outcome ===

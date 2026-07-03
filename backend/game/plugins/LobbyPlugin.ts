@@ -154,6 +154,15 @@ export class LobbyPlugin extends GamePlugin {
              *    This is because I donn't want user action to happen for the actual gamerow is fully set up.
              * - Joseph Habisohn 4/26/2026
              */
+            // Persist the seating/rotation order — leader_userid per round is
+            // stored, but without this the full turn order (and who got
+            // skipped) is unrecoverable after the game. Fire-and-forget:
+            // nothing in the game flow depends on it.
+            DAC.resistance.games.id(meta_data.gameid).updateSettings({
+                seatOrder: [...state.seatOrder],
+                firstLeaderId: state.leaderId,
+            }).catch(err => console.error('[DAC] seatOrder persist failed', err));
+
             await DAC.resistance.games.id(meta_data.gameid).start();
 
             this.room.broadcast("game:started", {});

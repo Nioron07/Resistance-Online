@@ -8,6 +8,25 @@ import { metricsRowsFromState } from "../../game/metrics/stateToRows.js";
 import { computeGamePoints } from "../../game/metrics/points.js";
 
 /**
+ * Per-game insert chains for voting_rounds. Round order is reconstructed
+ * from ascending serial ids, but rounds.create is fire-and-forget on a
+ * connection pool — two rounds' INSERTs could otherwise race and get ids
+ * out of chronological order. Chaining per game serializes them.
+ */
+const roundInsertChains = new Map<number, Promise<unknown>>();
+
+function chainRoundInsert<T>(gameid: number, run: () => Promise<T>): Promise<T> {
+    const prev = roundInsertChains.get(gameid) ?? Promise.resolve();
+    const next = prev.catch(() => undefined).then(run);
+    // Settled-safe tail; the map entry cleans itself up once it's last.
+    const tail: Promise<void> = next.then(() => undefined, () => undefined).then(() => {
+        if (roundInsertChains.get(gameid) === tail) roundInsertChains.delete(gameid);
+    });
+    roundInsertChains.set(gameid, tail);
+    return next;
+}
+
+/**
  * Build the per-player mission card record persisted in
  * `voting_rounds.mission_cards`. Returns null when no cards are present
  * (e.g., the round didn't go on a mission).
@@ -302,13 +321,23 @@ export abstract class DAC {
                                     playerRoles.set(playerId, state.players.get(playerId)?.role);
                                 }
 
+                                // Rejected-vote count derived from the actual
+                                // nomination records, NOT count_rounds:
+                                // count_rounds also ticks when a leader
+                                // disconnect re-fires nomination:start with no
+                                // nomination, which over-counted failed votes.
+                                const totalNominations =
+                                    _state.missions.reduce((n: number, m: MissionResult) => n + m.nominations.length, 0)
+                                    + _state.pendingNominations.length;
+                                const failedVotes = totalNominations - _state.missions.length;
+
                                 await db.transaction(async (client: PoolClient): Promise<QueryResult<QueryResultRow>> => {
                                     const date: string = new Date().toISOString()
                                     const queries: Promise<QueryResult<QueryResultRow>>[] = [];
 
                                     queries.push(client.query(DAC.queries.resistance.games.id.end.gameRow, [
                                         gameid,
-                                        _state.count_rounds - _state.missions.length,
+                                        failedVotes,
                                         _state.missions.map((e: MissionResult) => e.success),
                                         _state.endWinner === "resistance",
                                         reason,
@@ -434,7 +463,9 @@ export abstract class DAC {
 
                     // Single INSERT — a transaction wrapper here just adds
                     // BEGIN/COMMIT round-trips on every resolved round.
-                    return (await db.query<{ id: number }>(DAC.queries.resistance.rounds.create, [
+                    // Chained per game so serial ids match round order (the
+                    // replay reconstructs chronology from id ASC).
+                    return (await chainRoundInsert(gameid, () => db.query<{ id: number }>(DAC.queries.resistance.rounds.create, [
                             gameid,                                                                     // voting_rounds.game_id
                             state_copy.leaderId,                                                        // voting_rounds.leader_userid
                             lastNomination?.proposedTeam,                                               // voting_rounds.mission_participent_userids
@@ -443,10 +474,14 @@ export abstract class DAC {
                             lastNomination?.votes,                                                      // voting_rounds.vote_poll
                             lastNomination?.outcome,                                                    // voting_rounds.vote_status
                             !lastNomination?.outcome ? null : state_copy.missions.at(-1)?.success,      // voting_rounds.mission_status
-                            lastNomination?.outcome === undefined ? {} : state_copy.pendingVotes,       // voting_rounds.mission_details
+                            // Dead column: pendingVotes is always cleared
+                            // before this runs, so the old expression stored
+                            // {} on every row. The real ballots live in
+                            // vote_poll; write NULL rather than junk.
+                            null,                                                                       // voting_rounds.mission_details (deprecated)
                             state_copy.pendingSuspicions,                                               // voting_rounds.suspicions
                             missionCards                                                                // voting_rounds.mission_cards
-                    ])).rows[0]!.id;
+                    ]))).rows[0]!.id;
                 });
             },
             

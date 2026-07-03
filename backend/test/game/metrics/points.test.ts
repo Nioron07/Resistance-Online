@@ -272,8 +272,10 @@ describe('computeGamePoints — passive suspicion (the user example)', () => {
         })];
 
         const r = computeGamePoints('4', rows)!;
-        // Three voters trusted spy 4: 3 × +3 = +9
-        expect(r.breakdown.trusted_by_resistance_per_voter).toBe(SPY_ACTION_POINTS.trusted_by_resistance_per_voter * 3);
+        // Catalog v3: passive scoring is averaged per voter — all three
+        // voters trusting = exactly one full catalog value, regardless of
+        // table size.
+        expect(r.breakdown.trusted_by_resistance_per_voter).toBeCloseTo(SPY_ACTION_POINTS.trusted_by_resistance_per_voter);
         // The single reject_dirty_team is -3
         expect(r.breakdown.reject_dirty_team).toBe(SPY_ACTION_POINTS.reject_dirty_team);
         // Net of these two effects > 0 (the user's "way overshadows" claim).
@@ -305,8 +307,9 @@ describe('computeGamePoints — passive suspicion (the user example)', () => {
         })])!;
         const trust = (r.breakdown.trusted_by_resistance_per_voter ?? 0);
         const susp  = (r.breakdown.suspected_by_resistance_per_gamma ?? 0);
-        expect(trust).toBe(SPY_ACTION_POINTS.trusted_by_resistance_per_voter * 2);  // +6
-        expect(susp).toBe(SPY_ACTION_POINTS.suspected_by_resistance_per_gamma * 2); // -4
+        // v3 averaging over 3 voters: 2/3 of full trust, γ=2 mark ÷ 3.
+        expect(trust).toBeCloseTo(SPY_ACTION_POINTS.trusted_by_resistance_per_voter * (2 / 3));
+        expect(susp).toBeCloseTo(SPY_ACTION_POINTS.suspected_by_resistance_per_gamma * (2 / 3));
     });
 
     it('spy suspicions submitted by other spies are ignored entirely (only resistance voters count)', () => {
@@ -336,8 +339,9 @@ describe('computeGamePoints — passive suspicion (the user example)', () => {
                 '3': { '1': 4 },                 // marked player 1 at γ=4
             },
         })])!;
-        expect(r.breakdown.trusted_by_resistance_per_voter).toBe(RESISTANCE_ACTION_POINTS.trusted_by_resistance_per_voter);
-        expect(r.breakdown.suspected_by_resistance_per_gamma).toBe(RESISTANCE_ACTION_POINTS.suspected_by_resistance_per_gamma * 4);
+        // v3 averaging over 2 voters: half trust + a γ=4 mark ÷ 2.
+        expect(r.breakdown.trusted_by_resistance_per_voter).toBeCloseTo(RESISTANCE_ACTION_POINTS.trusted_by_resistance_per_voter / 2);
+        expect(r.breakdown.suspected_by_resistance_per_gamma).toBeCloseTo(RESISTANCE_ACTION_POINTS.suspected_by_resistance_per_gamma * 2);
     });
 });
 

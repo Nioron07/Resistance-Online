@@ -12,6 +12,7 @@ function makeRound(overrides: {
     resistance_win?: boolean | null;
     mission_status?: boolean | null;
     suspicions?: Record<string, Record<string, number>> | null;
+    vote_poll?: Record<string, boolean> | null;
 }): MetricsRow {
     return {
         game_id: overrides.game_id,
@@ -23,6 +24,7 @@ function makeRound(overrides: {
         mission_status: overrides.mission_status ?? null,
         resistance_win: overrides.resistance_win ?? null,
         suspicions: overrides.suspicions ?? null,
+        vote_poll: overrides.vote_poll ?? null,
         players: overrides.players,
         round_index_in_game: overrides.round_index_in_game,
     };
@@ -550,5 +552,53 @@ describe('Metrics', () => {
             expect(result.spy.RoIF_L).toBeNull();
             expect(result.resistance.RoS_L).not.toBeNull();
         });
+    });
+});
+
+describe('General metrics — LeaderApproval_L / Trust_L / VoteAcc_L', () => {
+    it('LeaderApproval_L = approved led rounds / led rounds', () => {
+        const rounds = [
+            makeRound({ game_id: 1, round_index_in_game: 0, players: PLAYERS_5, leader_userid: '1', vote_status: true }),
+            makeRound({ game_id: 1, round_index_in_game: 1, players: PLAYERS_5, leader_userid: '1', vote_status: false }),
+            makeRound({ game_id: 1, round_index_in_game: 2, players: PLAYERS_5, leader_userid: '2', vote_status: true }),
+        ];
+        expect(computeMetrics('1', rounds).general.LeaderApproval_L).toBeCloseTo(0.5);
+        expect(computeMetrics('3', rounds).general.LeaderApproval_L).toBeNull();
+    });
+
+    it('Trust_L = fraction of other resistance records omitting the player (spy records ignored)', () => {
+        const rounds = [
+            makeRound({
+                game_id: 1, round_index_in_game: 0, players: PLAYERS_5,
+                suspicions: {
+                    '2': { '4': 3 },          // omits 1 → trust
+                    '3': { '1': 2 },          // marks 1 → distrust
+                    '5': { '1': 5 },          // spy record — ignored
+                },
+            }),
+        ];
+        expect(computeMetrics('1', rounds).general.Trust_L).toBeCloseTo(0.5);
+    });
+
+    it('a gamma of 0 counts as trust', () => {
+        const rounds = [
+            makeRound({
+                game_id: 1, round_index_in_game: 0, players: PLAYERS_5,
+                suspicions: { '2': { '1': 0 } },
+            }),
+        ];
+        expect(computeMetrics('1', rounds).general.Trust_L).toBeCloseTo(1);
+    });
+
+    it('VoteAcc_L counts approve-clean and reject-dirty as correct (resistance only)', () => {
+        const rounds = [
+            makeRound({ game_id: 1, round_index_in_game: 0, players: PLAYERS_5, count_spies_nominated: 0, vote_poll: { '1': true,  '4': true } }),   // correct
+            makeRound({ game_id: 1, round_index_in_game: 1, players: PLAYERS_5, count_spies_nominated: 1, vote_poll: { '1': true,  '4': true } }),   // wrong (approved dirty)
+            makeRound({ game_id: 1, round_index_in_game: 2, players: PLAYERS_5, count_spies_nominated: 1, vote_poll: { '1': false, '4': true } }),   // correct (rejected dirty)
+            makeRound({ game_id: 1, round_index_in_game: 3, players: PLAYERS_5, count_spies_nominated: 0, vote_poll: { '1': false, '4': true } }),   // wrong (rejected clean)
+        ];
+        expect(computeMetrics('1', rounds).resistance.VoteAcc_L).toBeCloseTo(0.5);
+        // Spies have no vote accuracy.
+        expect(computeMetrics('4', rounds).resistance.VoteAcc_L).toBeNull();
     });
 });

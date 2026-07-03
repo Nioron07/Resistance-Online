@@ -229,14 +229,22 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
             else                       spyTotal       += row.points;
 
             const history = historyByUser.get(userid) ?? [];
-            const before = computeIndices(
-                history.filter(h => endTimestamp === null ? false : h.end_timestamp < endTimestamp).map(toPointsRow),
-                weighting,
-            );
-            const after = computeIndices(
-                history.filter(h => endTimestamp === null ? true : h.end_timestamp <= endTimestamp).map(toPointsRow),
-                weighting,
-            );
+            // "Before" = every game strictly earlier than THIS one. Ties on
+            // end_timestamp (back-to-back finishes, bulk imports) are broken
+            // by game id — same ordering as HISTORY_SQL — otherwise a tied
+            // sibling game leaks into both sides and inflates indexDelta.
+            // NOTE: end_timestamp compares as a string; safe only because
+            // both values come from the same column via the same driver.
+            const gameidNum = Number(gameid);
+            const isBefore = (h: HistoryRow) => endTimestamp === null
+                ? false
+                : (h.end_timestamp < endTimestamp
+                    || (h.end_timestamp === endTimestamp && Number(h.game_id) < gameidNum));
+            const isUpToHere = (h: HistoryRow) => endTimestamp === null
+                ? true
+                : (isBefore(h) || Number(h.game_id) === gameidNum);
+            const before = computeIndices(history.filter(isBefore).map(toPointsRow), weighting);
+            const after = computeIndices(history.filter(isUpToHere).map(toPointsRow), weighting);
 
             const complexMetric = side === 'resistance'
                 ? { key: 'RoS_G' as const, value: computeRoS_G(String(userid), roundsRows) }

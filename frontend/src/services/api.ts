@@ -51,7 +51,18 @@ export interface UserMetrics {
     gamesAsSpy: number
   }
   lifetimePoints: { resistance: number, spy: number, total: number }
-  resistance: { RoS_L: number | null, RoP_L: number | null }
+  general: {
+    /** Fraction of led nominations the table approved. */
+    LeaderApproval_L: number | null
+    /** Fraction of others' suspicion records that omitted this player. */
+    Trust_L: number | null
+  }
+  resistance: {
+    RoS_L: number | null
+    RoP_L: number | null
+    /** Fraction of objectively correct nomination votes as resistance. */
+    VoteAcc_L: number | null
+  }
   spy: { RoI_L: number | null, RoIF_L: number | null }
 }
 

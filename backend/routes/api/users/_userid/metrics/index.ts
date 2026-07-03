@@ -59,6 +59,7 @@ const metricsQuery = `
         vr.vote_status,
         vr.mission_status,
         vr.suspicions,
+        vr.vote_poll,
         g.players,
         g.resistance_win,
         ROW_NUMBER() OVER (
@@ -96,6 +97,23 @@ interface ComplexMetrics {
         /** Combined sum of resistance + spy. */
         total: number;
     };
+    general: {
+        /**
+         * Lifetime Leader Approval: fraction of this player's led
+         * nominations that the table approved. Both sides.
+         * null when the player has never led a nomination.
+         */
+        LeaderApproval_L: number | null;
+
+        /**
+         * Lifetime Trust: fraction of other resistance players' suspicion
+         * records that OMITTED this player (or left their slot at γ=0).
+         * Both sides — a spy's Trust is closely related to RoI, a
+         * resistance player's Trust shows how much the table believes them.
+         * null when nobody has ever submitted a suspicion record around them.
+         */
+        Trust_L: number | null;
+    };
     resistance: {
         /**
          * Lifetime Rate of Sherlock.
@@ -110,6 +128,14 @@ interface ComplexMetrics {
          * null when the player has never led a non-first round.
          */
         RoP_L: number | null;
+
+        /**
+         * Lifetime Vote Accuracy: fraction of this player's nomination
+         * votes (as resistance) that were objectively correct — approving
+         * clean teams and rejecting teams containing a spy.
+         * null when the player has never voted as resistance.
+         */
+        VoteAcc_L: number | null;
     };
     spy: {
         /**
@@ -150,6 +176,15 @@ export function computeMetrics(
     let RoIF_missions = 0;
     let RoIF_proposals = 0;
 
+    let led = 0;
+    let ledApproved = 0;
+
+    let trustRecords = 0;
+    let trustOmitted = 0;
+
+    let votesCast = 0;
+    let votesCorrect = 0;
+
     const byGame = new Map<number, MetricsRow[]>();
     for (const row of rounds) {
         if (!byGame.has(row.game_id)) byGame.set(row.game_id, []);
@@ -186,6 +221,10 @@ export function computeMetrics(
         if (!userIsSpy) {
             for (const row of gameRounds) {
                 if (String(row.leader_userid) !== userid) continue;
+                // Whitepaper (literal): exclude rounds that were "first in the
+                // game" — i.e. only the very first nomination attempt, NOT the
+                // whole first mission. A mission-1 re-nomination still counts
+                // even though its leader has barely more information.
                 if (Number(row.round_index_in_game) === 0) continue;
 
                 const team: string[] = row.mission_participent_userids ?? [];
@@ -227,6 +266,38 @@ export function computeMetrics(
                 }
             }
         }
+
+        // Leader approval (both sides), Trust (both sides), and Vote
+        // Accuracy (resistance only).
+        for (const row of gameRounds) {
+            if (String(row.leader_userid) === userid) {
+                led++;
+                if (row.vote_status === true) ledApproved++;
+            }
+
+            // Trust: every suspicion record submitted by ANOTHER resistance
+            // player either omitted this player (trust) or marked them.
+            if (row.suspicions) {
+                for (const [voterId, votes] of Object.entries(row.suspicions)) {
+                    if (voterId === userid) continue;
+                    const voterRole = players[voterId] ?? null;
+                    if (voterRole === null || SPY_ROLES.has(voterRole)) continue;
+                    trustRecords++;
+                    const gamma = Number(votes[userid] ?? 0);
+                    if (!Number.isFinite(gamma) || gamma <= 0) trustOmitted++;
+                }
+            }
+
+            // Vote accuracy: correct = approve clean OR reject dirty.
+            if (!userIsSpy && row.vote_poll && Object.prototype.hasOwnProperty.call(row.vote_poll, userid)) {
+                const vote = row.vote_poll[userid];
+                const dirty = (row.count_spies_nominated ?? 0) > 0;
+                if (vote === true || vote === false) {
+                    votesCast++;
+                    if ((vote === true && !dirty) || (vote === false && dirty)) votesCorrect++;
+                }
+            }
+        }
     }
 
     // RoI_L — average of per-game RoI over games where it's defined.
@@ -250,9 +321,14 @@ export function computeMetrics(
             spy: lifetimePoints.spy,
             total: lifetimePoints.resistance + lifetimePoints.spy,
         },
+        general: {
+            LeaderApproval_L: led > 0 ? ledApproved / led : null,
+            Trust_L: trustRecords > 0 ? trustOmitted / trustRecords : null,
+        },
         resistance: {
             RoS_L: RoS_game_count > 0 ? RoS_G_sum / RoS_game_count : null,
             RoP_L: RoP_denominator > 0 ? RoP_numerator / RoP_denominator : null,
+            VoteAcc_L: votesCast > 0 ? votesCorrect / votesCast : null,
         },
         spy: {
             RoI_L,
@@ -336,11 +412,19 @@ export const get_opts = {
                             total:      {type: 'number', description: 'Combined lifetime points'},
                         }
                     },
+                    general: {
+                        type: 'object',
+                        properties: {
+                            LeaderApproval_L: {type: ['number', 'null'], description: 'Fraction of led nominations that were approved. null if never led'},
+                            Trust_L:          {type: ['number', 'null'], description: "Fraction of others' suspicion records that omitted this player. null if no records exist"},
+                        }
+                    },
                     resistance: {
                         type: 'object',
                         properties: {
                             RoS_L:  {type: ['number', 'null'], description: 'Lifetime Rate of Sherlock. null if never voted as Resistance'},
                             RoP_L: {type: ['number', 'null'], description: 'Lifetime Rate of Purity. null if never led a non-first round'},
+                            VoteAcc_L: {type: ['number', 'null'], description: 'Fraction of objectively correct nomination votes as Resistance. null if never voted'},
                         }
                     },
                     spy: {

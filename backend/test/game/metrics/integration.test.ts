@@ -159,7 +159,10 @@ describe('metrics pipeline (state → rows → points) end-to-end', () => {
         for (const id of room.state.players.keys()) {
             const r = computeGamePoints(String(id), rows)!;
             const sum = Object.values(r.breakdown).reduce((a, b) => a + b, 0);
-            expect(r.points).toBe(sum);
+            // points is the breakdown total rounded to an integer (catalog v3
+            // passive averaging makes contributions fractional).
+            expect(r.points).toBe(Math.round(sum));
+            expect(Math.abs(r.points - sum)).toBeLessThanOrEqual(0.5);
         }
     });
 });

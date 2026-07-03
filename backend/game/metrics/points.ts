@@ -49,7 +49,9 @@ export function computeGamePoints(userid: string, rows: MetricsRow[]): GamePoint
     if (userWon) addPoint(side, breakdown, 'game_won');
     else         addPoint(side, breakdown, 'game_lost');
 
-    const points = sumBreakdown(breakdown);
+    // Passive suspicion averaging (catalog v3) makes contributions
+    // fractional; the persisted per-game total stays an integer.
+    const points = Math.round(sumBreakdown(breakdown));
     return { side, points, breakdown, catalogVersion: CATALOG_VERSION };
 }
 
@@ -193,6 +195,14 @@ function scoreActiveSuspicion(
  *
  * Magnitudes differ by side (spies see a much larger trust reward, since
  * "going undetected" is the spy's primary win condition).
+ *
+ * Catalog v3: contributions are averaged over the round's resistance
+ * voters rather than summed per voter. Per-voter summing made passive
+ * points scale with table size — a ghost spy in a 10-player game (6-7
+ * voters × up to 9 suspicion rounds) banked ~3× the trust of the same
+ * play in a 5-player game, so indices weren't comparable across game
+ * sizes. Now a fully-trusted round is worth exactly the catalog value
+ * regardless of player count.
  */
 function scorePassiveSuspicion(
     side: Side,
@@ -202,22 +212,28 @@ function scorePassiveSuspicion(
 ): void {
     if (!row.suspicions) return;
 
-    for (const [voterId, votes] of Object.entries(row.suspicions)) {
+    // Count eligible voters first so each contribution can be averaged.
+    let voterCount = 0;
+    for (const voterId of Object.keys(row.suspicions)) {
         if (voterId === userid) continue; // don't reward yourself for not suspecting yourself
         const voterRole = row.players[voterId] ?? null;
         if (voterRole === null || SPY_ROLES.has(voterRole)) continue; // resistance voters only
+        voterCount++;
+    }
+    if (voterCount === 0) return;
+
+    for (const [voterId, votes] of Object.entries(row.suspicions)) {
+        if (voterId === userid) continue;
+        const voterRole = row.players[voterId] ?? null;
+        if (voterRole === null || SPY_ROLES.has(voterRole)) continue;
 
         const gammaRaw = votes[userid];
-        if (gammaRaw === undefined) {
-            addPoint(side, breakdown, 'trusted_by_resistance_per_voter');
-            continue;
-        }
-        const gamma = clampGamma(gammaRaw);
+        const gamma = gammaRaw === undefined ? 0 : clampGamma(gammaRaw);
         if (gamma === 0) {
-            // Slot was left empty; treat as a trust signal.
-            addPoint(side, breakdown, 'trusted_by_resistance_per_voter');
+            // Omitted or slot left empty; a trust signal.
+            addPoint(side, breakdown, 'trusted_by_resistance_per_voter', 1 / voterCount);
         } else {
-            addPoint(side, breakdown, 'suspected_by_resistance_per_gamma', gamma);
+            addPoint(side, breakdown, 'suspected_by_resistance_per_gamma', gamma / voterCount);
         }
     }
 }
