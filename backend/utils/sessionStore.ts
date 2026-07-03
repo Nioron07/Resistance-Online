@@ -43,6 +43,14 @@ export class PgSessionStore implements SessionStore {
         return new Date(Date.now() + 86_400_000)
     }
 
+    // NOTE: every method uses the two-argument `.then(onFulfilled, onRejected)`
+    // form rather than `.then(...).catch(...)`. A trailing `.catch` would also
+    // catch errors thrown *inside* the callback (fastify-session invokes its
+    // save callback synchronously while processing onSend hooks, which can
+    // throw) and call the callback a second time — a double invocation
+    // corrupts fastify's hook chain and surfaces as "cb is not a function".
+    // The onRejected handler here only ever sees a real DB rejection.
+
     set(sessionId: string, session: Session, callback: (err?: Error) => void): void {
         this.ensureTable()
             .then(() => query(
@@ -51,8 +59,10 @@ export class PgSessionStore implements SessionStore {
                  ON CONFLICT (sid) DO UPDATE SET sess = $2, expires_at = $3;`,
                 [sessionId, JSON.stringify(session), this.expiryOf(session)],
             ))
-            .then(() => callback())
-            .catch(err => callback(err as Error))
+            .then(
+                () => callback(),
+                (err: unknown) => callback(err as Error),
+            )
     }
 
     get(sessionId: string, callback: (err: Error | null, session: Session | null) => void): void {
@@ -61,14 +71,18 @@ export class PgSessionStore implements SessionStore {
                 `SELECT sess FROM sessions WHERE sid = $1 AND expires_at >= NOW();`,
                 [sessionId],
             ))
-            .then(result => callback(null, result.rows[0]?.sess ?? null))
-            .catch(err => callback(err as Error, null))
+            .then(
+                result => callback(null, result.rows[0]?.sess ?? null),
+                (err: unknown) => callback(err as Error, null),
+            )
     }
 
     destroy(sessionId: string, callback: (err?: Error) => void): void {
         this.ensureTable()
             .then(() => query(`DELETE FROM sessions WHERE sid = $1;`, [sessionId]))
-            .then(() => callback())
-            .catch(err => callback(err as Error))
+            .then(
+                () => callback(),
+                (err: unknown) => callback(err as Error),
+            )
     }
 }
