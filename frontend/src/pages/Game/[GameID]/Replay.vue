@@ -267,6 +267,7 @@
     type GameReplay,
     type GameReplayPlayer,
     type GameReplayRound,
+    type RoundPhase,
   } from '@/services/api'
   import { useGameStore } from '@/stores/game'
 
@@ -373,10 +374,19 @@
   const currentStep = computed<Step | null>(() => steps.value[currentIndex.value] ?? null)
 
   // --- Eval bar ---
-  /** roundId → cumulative differential AFTER that round resolved. */
-  const evalByRoundId = computed<Record<number, number>>(() => {
-    const map: Record<number, number> = {}
-    for (const p of data.value?.evalSeries ?? []) map[p.roundId] = p.differential
+  /**
+   * roundId → { before, phaseDeltas }: cumulative differential BEFORE the
+   * round plus the round's per-phase contributions, so the bar can advance
+   * at every sub-step (nomination → vote → mission → suspicion) instead of
+   * jumping once per round.
+   */
+  const evalByRoundId = computed<Record<number, { before: number, phaseDeltas: Record<RoundPhase, number> }>>(() => {
+    const map: Record<number, { before: number, phaseDeltas: Record<RoundPhase, number> }> = {}
+    let before = 0
+    for (const p of data.value?.evalSeries ?? []) {
+      map[p.roundId] = { before, phaseDeltas: p.phaseDeltas }
+      before = p.differential
+    }
     return map
   })
 
@@ -386,10 +396,12 @@
     return max
   })
 
+  const PHASE_ORDER: readonly RoundPhase[] = ['nomination', 'vote', 'mission', 'suspicion']
+
   /**
-   * Differential shown at the current step. Steps belonging to a round show
-   * the eval after that round resolves; identity shows the neutral 0;
-   * outcome shows the final value.
+   * Differential shown at the current step: everything before this round,
+   * plus this round's phases up to and including the current step's phase.
+   * Identity shows the neutral 0; outcome shows the final value.
    */
   const currentEval = computed(() => {
     const step = currentStep.value
@@ -397,7 +409,15 @@
     if (!step || series.length === 0) return 0
     if (step.kind === 'identity') return 0
     if (step.kind === 'outcome') return series.at(-1)!.differential
-    return evalByRoundId.value[step.round.roundId] ?? 0
+
+    const entry = evalByRoundId.value[step.round.roundId]
+    if (!entry) return 0
+    let value = entry.before
+    for (const phase of PHASE_ORDER) {
+      value += entry.phaseDeltas[phase] ?? 0
+      if (phase === step.kind) break
+    }
+    return value
   })
 
   /**

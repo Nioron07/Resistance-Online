@@ -158,6 +158,8 @@ export interface GameReplayRound {
   suspicions: Record<string, Record<string, number>> | null
 }
 
+export type RoundPhase = 'nomination' | 'vote' | 'mission' | 'suspicion'
+
 export interface EvalPoint {
   /** Aligns with GameReplayRound.roundId. */
   roundId: number
@@ -166,6 +168,11 @@ export interface EvalPoint {
   spyDelta: number
   /** Cumulative resistance − spy points after this round. */
   differential: number
+  /**
+   * This round's differential contribution (resistance − spy) split by
+   * phase, so the bar can advance step by step within a round.
+   */
+  phaseDeltas: Record<RoundPhase, number>
 }
 
 export interface GameReplay {

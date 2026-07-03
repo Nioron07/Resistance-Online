@@ -79,6 +79,47 @@ describe('computeEvalSeries', () => {
         expect(series[1]!.differential).toBeCloseTo(rApprove - sApprove);
     });
 
+    it('phaseDeltas sum to the round differential and land on the right phases', () => {
+        const r = row({
+            round_id: 1,
+            leader_userid: '1',                                  // resistance leads clean team → nomination
+            count_spies_nominated: 0,
+            mission_participent_userids: ['1', '2'],
+            vote_status: true,
+            mission_status: true,
+            vote_poll: { '1': true, '2': true, '3': true, '4': false, '5': false },  // vote
+            mission_cards: { '1': 'success', '2': 'success' },   // mission
+            suspicions: { '3': { '4': 2 } },                     // suspicion
+        });
+        const [p] = computeEvalSeries([r]);
+
+        // Every phase used by this round contributes something…
+        expect(p!.phaseDeltas.nomination).toBeCloseTo(RESISTANCE_ACTION_POINTS.led_clean_team);
+        expect(p!.phaseDeltas.vote).not.toBe(0);
+        expect(p!.phaseDeltas.mission).not.toBe(0);
+        expect(p!.phaseDeltas.suspicion).not.toBe(0);
+
+        // …and the phases exactly reconstruct the round's differential.
+        const phaseSum = p!.phaseDeltas.nomination + p!.phaseDeltas.vote
+            + p!.phaseDeltas.mission + p!.phaseDeltas.suspicion;
+        expect(phaseSum).toBeCloseTo(p!.resistanceDelta - p!.spyDelta);
+        expect(phaseSum).toBeCloseTo(p!.differential);
+    });
+
+    it('a rejected round has zero mission-phase delta', () => {
+        const r = row({
+            round_id: 1,
+            leader_userid: '4',
+            count_spies_nominated: 1,
+            mission_participent_userids: ['4', '1'],
+            vote_status: false,
+            mission_status: null,
+            vote_poll: { '1': false, '2': false, '3': false, '4': true, '5': true },
+        });
+        const [p] = computeEvalSeries([r]);
+        expect(p!.phaseDeltas.mission).toBe(0);
+    });
+
     it('summed per-round deltas + outcome bonus reproduce computeGamePoints', () => {
         const rows = [
             row({

@@ -54,19 +54,24 @@ export function computeGamePoints(userid: string, rows: MetricsRow[]): GamePoint
 }
 
 /**
- * Points one player earned in a single round (all per-round scorers, no
- * end-of-game outcome bonus). This is the building block for the eval-bar
- * time series: summing it over every round of a game plus the outcome
- * bonus reproduces computeGamePoints exactly.
+ * Per-action breakdown one player earned in a single round (all per-round
+ * scorers, no end-of-game outcome bonus). This is the building block for
+ * the eval-bar time series: summing it over every round of a game plus the
+ * outcome bonus reproduces computeGamePoints exactly.
  */
-export function scoreRowForPlayer(side: Side, userid: string, row: MetricsRow): number {
+export function scoreRowBreakdownForPlayer(side: Side, userid: string, row: MetricsRow): Record<string, number> {
     const breakdown: Record<string, number> = {};
     scoreVoteAndOutcome(side, userid, row, breakdown);
     scoreLeadership(side, userid, row, breakdown);
     scoreTeamParticipation(side, userid, row, breakdown);
     scoreActiveSuspicion(side, userid, row, breakdown);
     scorePassiveSuspicion(side, userid, row, breakdown);
-    return sumBreakdown(breakdown);
+    return breakdown;
+}
+
+/** Total points one player earned in a single round. */
+export function scoreRowForPlayer(side: Side, userid: string, row: MetricsRow): number {
+    return sumBreakdown(scoreRowBreakdownForPlayer(side, userid, row));
 }
 
 // ---------------------------- voting + mission-outcome bonus ---------------------------- \\
