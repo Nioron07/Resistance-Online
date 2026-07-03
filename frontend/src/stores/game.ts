@@ -62,6 +62,10 @@ export const useGameStore = defineStore('game', () => {
   const missionOutcomes = ref<string[]>(['transparent', 'transparent', 'transparent', 'transparent', 'transparent'])
   const myRole = ref<RoleName | null>(null)
   const knownRoles = ref<Record<PlayerId, KnownRole> | undefined>(undefined)
+  // Bumped whenever the server rejects the self-reported role composition;
+  // IdentitySelection watches this to re-open the selection UI.
+  const roleResetNonce = ref(0)
+  const roleResetMessage = ref('')
   const winner = ref<'resistance' | 'spies' | null>(null)
   const endReason = ref('')
 
@@ -169,6 +173,13 @@ export const useGameStore = defineStore('game', () => {
       knownRoles.value = d.knownRoles
     })
 
+    socket.on('role:reset', d => {
+      myRole.value = null
+      knownRoles.value = undefined
+      roleResetMessage.value = d.message
+      roleResetNonce.value++
+    })
+
     socket.on('nomination:started', d => {
       phase.value = 'nomination'
       leaderId.value = d.leaderId
@@ -221,6 +232,10 @@ export const useGameStore = defineStore('game', () => {
       winner.value = d.winner
       endReason.value = d.reason
       router.push(`/Game/${joinCode.value}/EndState`)
+      // The game is over and EndState/Replay are REST-fed read-only views —
+      // don't keep a live socket (and its ping keepalive) open behind them.
+      socket.close()
+      handlersRegistered = false
     })
 
     socket.on('socket:error', d => {
@@ -343,6 +358,7 @@ export const useGameStore = defineStore('game', () => {
     missionOutcomes.value = ['transparent', 'transparent', 'transparent', 'transparent', 'transparent']
     myRole.value = null
     knownRoles.value = undefined
+    roleResetMessage.value = ''
     winner.value = null
     endReason.value = ''
   }
@@ -443,6 +459,7 @@ export const useGameStore = defineStore('game', () => {
     mission, round, nominatedTeam, nominatedTeamNames, amOnTeam,
     votesReceived, lastVoteResult,
     missionOutcomes, myRole, knownRoles,
+    roleResetNonce, roleResetMessage,
     winner, endReason,
     // rules-derived
     rules, numSpies, numResistance, teamSizes, currTeamSize, backgroundImage,

@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest, RouteHandler } from "fastify";
 import { queryAll, queryOne } from "../../../../../utils/db.js";
-import { SPY_ROLES } from "../../../users/_userid/metrics/index.js";
+import { SPY_ROLES, type MetricsRow } from "../../../users/_userid/metrics/index.js";
+import { computeEvalSeries } from "../../../../../game/metrics/evalSeries.js";
 
 /**
  * GET /api/games/:gameid/replay
@@ -165,6 +166,26 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
             }
         }
 
+        // Eval-bar series: reshape the round rows into the MetricsRow form
+        // the point engine expects (per-round data + game-level players/win)
+        // and compute the cumulative team point differential.
+        const metricsRows: MetricsRow[] = roundRows.map((r, i) => ({
+            game_id: Number(header.id),
+            round_id: Number(r.round_id),
+            leader_userid: r.leader_userid === null ? null : String(r.leader_userid),
+            mission_participent_userids: (r.mission_participent_userids ?? []).map(String),
+            count_spies_nominated: r.count_spies_nominated,
+            vote_status: r.vote_status,
+            mission_status: r.mission_status,
+            suspicions: r.suspicions,
+            players: header.players,
+            resistance_win: header.resistance_win,
+            round_index_in_game: i,
+            mission_cards: r.mission_cards,
+            vote_poll: r.vote_poll,
+        }));
+        const evalSeries = computeEvalSeries(metricsRows);
+
         // Pad mission_statuses to length 5 so the frontend's MissionTracker
         // always has the expected shape, regardless of how many missions
         // actually ran.
@@ -185,6 +206,7 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
             },
             players,
             rounds,
+            evalSeries,
         });
     } catch (error) {
         console.error(error);

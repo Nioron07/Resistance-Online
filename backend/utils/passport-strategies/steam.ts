@@ -1,6 +1,5 @@
 import 'dotenv/config'
 import SteamStrategy from 'passport-steam'
-import { getUseridByProviderUID } from '../db-queries/queryUsers.js';
 import { DAC } from '../db-queries/DataAccessClass.js';
 
 console.log(`Backend Url: ${process.env.BACKEND_BASE_URL}`);
@@ -17,7 +16,7 @@ export const Steam = new SteamStrategy(
   async (identifier: string, profile, done) => {
     try {
       // Grab the userid if there exists a user such that their steamId matches @profile.id
-      let userid = await getUseridByProviderUID('steam', profile.id);
+      let userid = await DAC.users.provider('steam').uid(profile.id).getUseridByProviderUID();
 
       // If it does not exist, then this is a new user logging in. Therefore, create a record for them.
       if (userid === undefined) {

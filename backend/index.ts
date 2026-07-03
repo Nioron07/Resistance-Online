@@ -15,12 +15,36 @@ import { existsSync } from 'node:fs'
 
 import { closePool } from './utils/db.js'
 import { passport } from './utils/passport.js'
+import { PgSessionStore } from './utils/sessionStore.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
+const isProduction = process.env.NODE_ENV === 'production'
+
+// Fail fast on a missing/default session secret rather than shipping
+// forgeable sessions.
+const sessionSecret = process.env.SESSION_SECRET
+if (isProduction && (!sessionSecret || sessionSecret === 'change_me_in_production')) {
+  console.error('SESSION_SECRET must be set to a real secret in production.')
+  process.exit(1)
+}
+
 const server: FastifyInstance = fastify({
   trustProxy: true,
+})
+
+/**
+ * Global auth gate for the REST data API. Registered before any routes so
+ * it applies to everything under /api/**. Auth endpoints (/auth/**) and the
+ * SPA/static assets are unaffected; websocket upgrade routes do their own
+ * isAuthenticated() check in the upgrade handler.
+ */
+server.addHook('preHandler', async (req, rep) => {
+  if (!req.url.startsWith('/api')) return
+  if (typeof req.isAuthenticated !== 'function' || !req.isAuthenticated()) {
+    return rep.code(401).send({ error: 'Unauthorized' })
+  }
 })
 
 // CORS!!!!!! YIPPEEE!!!!!!
@@ -58,15 +82,20 @@ await server.register(cookie);
  * We are using a Backend-for-Frontend (BFF) setup
  */
 await server.register(session, {
-  secret: process.env.SESSION_SECRET!,
+  secret: sessionSecret ?? 'dev_only_secret_change_me_change_me',
+  // Postgres-backed store: sessions survive restarts and are shared across
+  // Cloud Run instances (the default MemoryStore is per-instance and never
+  // evicts). saveUninitialized:false stops every anonymous visitor from
+  // allocating a session row.
+  store: new PgSessionStore(),
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isProduction,
     sameSite: 'lax',
     path: "/",
     maxAge: 86400000,
   },
-  saveUninitialized: true,
+  saveUninitialized: false,
 });
 
 // Initialize the passport onto fastify and then allow it to be saved to the session

@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest, RouteHandler } from "fas
 import { queryAll } from "../../../../../utils/db.js";
 import {
     computeIndices,
+    computeIndexHistory,
     type WeightingStrategy,
 } from "../../../../../game/metrics/indices.js";
 
@@ -14,6 +15,7 @@ type Get = {
 };
 
 interface PointsQueryRow {
+    game_id: string | number;
     side: 'resistance' | 'spy';
     points: number;
     end_timestamp: string;
@@ -22,7 +24,7 @@ interface PointsQueryRow {
 }
 
 const pointsQuery = `
-    SELECT pgm.side, pgm.points, pgm.catalog_version, pgm.computed_at, g.end_timestamp
+    SELECT pgm.game_id, pgm.side, pgm.points, pgm.catalog_version, pgm.computed_at, g.end_timestamp
     FROM player_game_metrics pgm
     JOIN games g ON g.id = pgm.game_id
     WHERE pgm.user_id = $1
@@ -44,6 +46,17 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
         const rows = await queryAll<PointsQueryRow>(pointsQuery, [userid]);
 
         const result = computeIndices(rows, weighting);
+
+        // Per-game index trajectory for the profile rating chart.
+        const history = computeIndexHistory(
+            rows.map(r => ({
+                gameid: Number(r.game_id),
+                endTimestamp: r.end_timestamp,
+                side: r.side,
+                points: Number(r.points),
+            })),
+            weighting,
+        );
 
         // Most-common catalog version among the rows used (helps consumers
         // know which catalog the indices reflect).
@@ -67,6 +80,7 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
             rIndex: result.rIndex,
             sIndex: result.sIndex,
             pIndex: result.pIndex,
+            history,
             details: {
                 resistanceGames: result.resistanceGames,
                 spyGames: result.spyGames,

@@ -148,9 +148,20 @@ describe('validateClientEvent', () => {
     });
 
     describe('sus:submit', () => {
-        it('accepts a record of finite numbers', () => {
-            const r = validateClientEvent('sus:submit', { sus: { 1: 5, 2: 3.5 } });
+        it('accepts a record of integer confidences in 0..5', () => {
+            const r = validateClientEvent('sus:submit', { sus: { 1: 5, 2: 3, 3: 0 } });
             expect(r.ok).toBe(true);
+        });
+
+        it('rejects non-integer confidences', () => {
+            const r = validateClientEvent('sus:submit', { sus: { 1: 3.5 } });
+            expect(r.ok).toBe(false);
+        });
+
+        it('rejects confidences outside 0..5', () => {
+            expect(validateClientEvent('sus:submit', { sus: { 1: 6 } }).ok).toBe(false);
+            expect(validateClientEvent('sus:submit', { sus: { 1: -1 } }).ok).toBe(false);
+            expect(validateClientEvent('sus:submit', { sus: { 1: 1e300 } }).ok).toBe(false);
         });
 
         it('rejects non-object sus', () => {

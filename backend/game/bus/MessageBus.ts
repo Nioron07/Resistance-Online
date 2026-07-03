@@ -38,7 +38,8 @@ export class MessageBus<E extends Record<string, unknown>> {
      */
     emit<K extends keyof E>(event: K, data: E[K]) {
         this.pushBounded(this.replayLog, {event, data, time: Date.now()});
-        this.pushBounded(this.eventLog, {event, data, time: Date.now()});
+        // eventLog is appended inside emitInternal — pushing here too would
+        // double-log every root event.
         this.emitInternal(event, data);
     }
 

@@ -39,6 +39,11 @@
         </div>
       </div>
 
+      <!-- Eval bar: cumulative team point differential up to the current step -->
+      <div v-if="data.evalSeries && data.evalSeries.length > 0" class="r-eval-wrap">
+        <EvalBar :differential="currentEval" :max-abs="evalMaxAbs" />
+      </div>
+
       <!-- Step card -->
       <article v-if="currentStep" class="r-step-card" :class="`r-step-${currentStep.kind}`">
         <header class="r-step-header">
@@ -253,6 +258,7 @@
 <script setup lang="ts">
   import { computed, onMounted, onUnmounted, ref } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
+  import EvalBar from '@/components/EvalBar.vue'
   import GameOutcomeChip from '@/components/GameOutcomeChip.vue'
   import MissionTracker from '@/components/MissionTracker.vue'
   import PlayerCell from '@/components/PlayerCell.vue'
@@ -365,6 +371,34 @@
   })
 
   const currentStep = computed<Step | null>(() => steps.value[currentIndex.value] ?? null)
+
+  // --- Eval bar ---
+  /** roundId → cumulative differential AFTER that round resolved. */
+  const evalByRoundId = computed<Record<number, number>>(() => {
+    const map: Record<number, number> = {}
+    for (const p of data.value?.evalSeries ?? []) map[p.roundId] = p.differential
+    return map
+  })
+
+  const evalMaxAbs = computed(() => {
+    let max = 0
+    for (const p of data.value?.evalSeries ?? []) max = Math.max(max, Math.abs(p.differential))
+    return max
+  })
+
+  /**
+   * Differential shown at the current step. Steps belonging to a round show
+   * the eval after that round resolves; identity shows the neutral 0;
+   * outcome shows the final value.
+   */
+  const currentEval = computed(() => {
+    const step = currentStep.value
+    const series = data.value?.evalSeries ?? []
+    if (!step || series.length === 0) return 0
+    if (step.kind === 'identity') return 0
+    if (step.kind === 'outcome') return series.at(-1)!.differential
+    return evalByRoundId.value[step.round.roundId] ?? 0
+  })
 
   /**
    * Tick coloring: mission-based for round steps, neutral for identity/outcome,
@@ -593,6 +627,8 @@
   letter-spacing: 0.08em;
   color: rgb(var(--v-theme-on-surface-muted));
 }
+
+.r-eval-wrap { margin-bottom: 16px; }
 
 .r-step-card {
   background-color: rgb(var(--v-theme-surface));

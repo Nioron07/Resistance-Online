@@ -17,18 +17,96 @@ export class ResistanceCore extends GamePlugin {
         };
 
         /**
-         * role:submit -> roles:assigned IF all votes are submitted
+         * Resolve the nomination vote once every *connected* player has
+         * voted. Disconnected players don't block the phase; their missing
+         * votes count as rejects because approval still requires a majority
+         * of ALL seated players.
+         */
+        const maybeResolveVotes = () => {
+            if (state.phase !== 'voting') return;
+
+            const allConnectedVoted = Array.from(state.players.values())
+                .every(p => !p.connected || p.playerId in state.pendingVotes);
+            if (!allConnectedVoted) return;
+            if (Object.keys(state.pendingVotes).length === 0) return;
+
+            const votes = state.pendingVotes;
+            const approved = Object.values(votes).filter(v => v).length > state.players.size / 2;
+
+            bus.emitInternal("nomination:resolve", {approved});
+        };
+
+        /**
+         * Complete the suspicion phase once every *connected* resistance
+         * player has submitted. Disconnected players don't block; their
+         * records are simply absent for the round.
+         */
+        const maybeCompleteSuspicion = () => {
+            if (state.phase !== 'suspicion') return;
+
+            const allConnectedResistanceSubmitted = Array.from(state.players.values())
+                .every(p => !p.connected
+                    || p.role === undefined
+                    || teamOf(p.role) === 'spy'
+                    || p.playerId in state.pendingSuspicions);
+            if (!allConnectedResistanceSubmitted) return;
+
+            bus.emitInternal("suspicion:complete", {cameFromMission});
+        };
+
+        /**
+         * Runs after LobbyPlugin (priority 100) has marked the player
+         * disconnected. If the leaver was the one gating the current phase,
+         * move the game along instead of stalling forever:
+         * - nomination: rotate the leadership to the next connected player
+         * - voting / suspicion: re-check completion without them
+         * Mission and role-reveal can't be skipped (their input is the
+         * content of the phase); those wait for a reconnect and fall back
+         * to the abandoned-room teardown.
+         */
+        bus.on("player:disconnect", 50, e => {
+            if (state.phase === 'nomination' && state.leaderId === e.playerId) {
+                bus.emitInternal("nomination:start", {});
+                return;
+            }
+            if (state.phase === 'voting') maybeResolveVotes();
+            if (state.phase === 'suspicion') maybeCompleteSuspicion();
+        });
+
+        /**
+         * role:submit -> roles:assigned once everyone has submitted.
+         *
+         * The payload reports the physical role card the player was dealt
+         * (this is a companion app for in-person play). Once all roles are
+         * in, the composition is validated against the rules — a wrong spy
+         * count clears every role and asks the table to re-submit.
          */
         bus.on("role:submit", 100, e => {
             if (state.phase !== 'role-reveal') return;
+            const player = state.players.get(e.senderId);
+            if (!player) return;
 
-            state.players.get(e.senderId)!.role = e.role;
-
-            DAC.resistance.games.id(meta_data.gameid).playerId(e.senderId).update(e.role)
-                .catch(err => console.error('[DAC] playerId.update failed', err));
+            player.role = e.role;
 
             const allSubmitted = Array.from(state.players.values()).every(p => p.role !== undefined);
             if (!allSubmitted) return;
+
+            // Self-reported roles must add up to a legal game: exactly
+            // rules.spyCount spies. Anything else means someone misclicked
+            // (or is lying about their card) — reset and re-collect.
+            const spyCount = Array.from(state.players.values()).filter(p => teamOf(p.role!) === 'spy').length;
+            if (spyCount !== state.activeRules.spyCount) {
+                for (const p of state.players.values()) p.role = undefined;
+                this.room.broadcast("role:reset", {
+                    message: `Submitted roles don't match the rules (${spyCount} spies reported, expected ${state.activeRules.spyCount}). Everyone must re-select.`,
+                });
+                return;
+            }
+
+            for (const [playerId, p] of state.players.entries()) {
+                DAC.resistance.games.id(meta_data.gameid).playerId(playerId).update(p.role!)
+                    .catch(err => console.error('[DAC] playerId.update failed', err));
+            }
 
             bus.emitInternal("roles:assigned", {});
         });
@@ -118,12 +196,7 @@ export class ResistanceCore extends GamePlugin {
             // value) so the UI can show partial progress.
             this.room.broadcast("vote:received", { playerId: e.senderId });
 
-            if (!state.allVotesCast()) return;
-
-            const votes = state.pendingVotes;
-            const approved = Object.values(votes).filter(v => v).length > Object.keys(votes).length / 2;
-
-            bus.emitInternal("nomination:resolve", {approved});
+            maybeResolveVotes();
         });
 
         /**
@@ -207,9 +280,7 @@ export class ResistanceCore extends GamePlugin {
 
             this.room.broadcast("suspicion:received", { playerId: e.senderId });
 
-            if (!state.allSusCast()) return;
-
-            bus.emitInternal("suspicion:complete", {cameFromMission});
+            maybeCompleteSuspicion();
         });
 
         /**

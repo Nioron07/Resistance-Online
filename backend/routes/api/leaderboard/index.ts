@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest, RouteHandler } from "fastify";
 import { queryAll } from "../../../utils/db.js";
+import { TtlCache } from "../../../utils/ttlCache.js";
 import {
     computeIndices,
     type WeightingStrategy,
@@ -67,6 +68,11 @@ interface OutRow {
     games: number;
 }
 
+// The index leaderboard loads the whole player_game_metrics table and
+// re-derives every player's index — O(games × players) per request. A
+// short TTL absorbs request bursts; 30s of staleness is invisible here.
+const leaderboardCache = new TtlCache<OutRow[]>(30_000);
+
 export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: FastifyReply) => {
     try {
         const metric = (req.query.metric ?? 'pIndex') as Metric;
@@ -94,8 +100,11 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
                 games: Number(r.games),
             }));
         } else {
-            const all = await queryAll<IndexRow>(INDEX_SQL);
-            rows = computeIndexLeaderboard(all, metric, weighting, limit);
+            const cacheKey = `${metric}:${weighting.strategy}:${weighting.strategy === 'expdecay' ? weighting.alpha : ''}:${limit}`;
+            rows = await leaderboardCache.getOrCompute(cacheKey, async () => {
+                const all = await queryAll<IndexRow>(INDEX_SQL);
+                return computeIndexLeaderboard(all, metric, weighting, limit);
+            });
         }
 
         rep.code(200).send({

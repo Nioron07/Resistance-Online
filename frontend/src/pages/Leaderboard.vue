@@ -119,17 +119,24 @@
     if (row.username) router.push(`/Profile/${encodeURIComponent(row.username)}`)
   }
 
+  // Abort the previous request on rapid tab switches so a slow earlier
+  // response can't overwrite the newer tab's rows.
+  let loadAbort: AbortController | null = null
   async function load () {
+    loadAbort?.abort()
+    const abort = new AbortController()
+    loadAbort = abort
     loading.value = true
     error.value = ''
     try {
-      const r = await fetchLeaderboard(activeMetric.value, 50)
+      const r = await fetchLeaderboard(activeMetric.value, 50, undefined, { signal: abort.signal })
       rows.value = r.rows
     } catch (error_) {
+      if ((error_ as Error).name === 'AbortError') return
       error.value = (error_ as Error).message
       rows.value = []
     } finally {
-      loading.value = false
+      if (loadAbort === abort) loading.value = false
     }
   }
 

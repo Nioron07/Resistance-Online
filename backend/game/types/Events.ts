@@ -3,9 +3,13 @@ import {KnownRole, PlayerId, RoleName} from './GameTypes.js';
 // Client -> Server
 export type ClientEventsBase = {
 
+    /**
+     * Host-only, lobby-phase only. All fields optional — only the fields
+     * present are applied to the config.
+     */
     'game:configure': {
-        modulesEnabled: string[];
-        optionalRoles: RoleName[];
+        modulesEnabled?: string[];
+        optionalRoles?: RoleName[];
     }
 
     'game:start': {
@@ -13,6 +17,11 @@ export type ClientEventsBase = {
         seatOrder: PlayerId[];
     }
 
+    /**
+     * Reports the physical role card the player was dealt. The server
+     * validates the full composition (spy count) once everyone has
+     * submitted and broadcasts `role:reset` on a mismatch.
+     */
     'role:submit': {
         role: RoleName;
     }
@@ -145,11 +154,28 @@ export type ServerEvents = {
         hostId: PlayerId | null;
     }
 
+    /**
+     * Broadcast whenever the host changes the game configuration so every
+     * lobby client can render the current settings.
+     */
+    'game:configured': {
+        modulesEnabled: string[];
+        optionalRoles: RoleName[];
+    }
+
     'game:started': Record<string, never>
 
     'role:assigned': {
         role: RoleName;
         knownRoles: Record<PlayerId, KnownRole> | undefined;
+    }
+
+    /**
+     * The self-reported roles didn't add up to a legal composition (wrong
+     * spy count). All roles were cleared — everyone must re-submit.
+     */
+    'role:reset': {
+        message: string;
     }
 
     'nomination:started': {

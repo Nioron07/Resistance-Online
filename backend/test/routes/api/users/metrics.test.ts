@@ -418,7 +418,10 @@ describe('Metrics', () => {
             expect(RoI_L).toBeNull();
         });
 
-        it('returns 1.0 when user was a spy in a game with no suspicion records', () => {
+        it('returns null when a spy game has no suspicion records (no data, excluded)', () => {
+            // A game with zero suspicion records carries no information
+            // about how well the spy hid, so it is excluded from the
+            // lifetime average instead of counting as a perfect 1.0.
             const rounds = [
                 makeRound({
                     game_id: 1,
@@ -428,7 +431,7 @@ describe('Metrics', () => {
                 }),
             ];
             const {RoI_L} = computeMetrics('1', rounds).spy;
-            expect(RoI_L).toBeCloseTo(1.0);
+            expect(RoI_L).toBeNull();
         });
     });
 

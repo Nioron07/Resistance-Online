@@ -13,6 +13,7 @@
     "start:server": "node dist/index.js",
     "start": "concurrently --kill-others \"npm run start:proxy\" \"npm run start:server\"",
     "dev": "npm run build && npm start",
+    "recompute-metrics": "npm run build && node dist/scripts/recompute-metrics.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },

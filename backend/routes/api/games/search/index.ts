@@ -39,12 +39,20 @@ interface GameRow {
     player_count: number;
 }
 
+/**
+ * player_count is computed ONCE per row via a LATERAL join and reused by
+ * the SELECT list and both min/max filters — previously three separate
+ * correlated jsonb_object_keys() subqueries per row, per query.
+ */
 const ROW_SQL = `
     SELECT
         g.id, g.resistance_win, g.outcome_type, g.mission_statuses,
         g.start_timestamp, g.end_timestamp, g.count_failed_votes,
-        (SELECT COUNT(*)::int FROM jsonb_object_keys(g.players)) AS player_count
+        pc.player_count
     FROM public.games g
+    CROSS JOIN LATERAL (
+        SELECT COUNT(*)::int AS player_count FROM jsonb_object_keys(g.players)
+    ) pc
     WHERE g.end_timestamp IS NOT NULL
       AND ($1::text IS NULL OR EXISTS (
             SELECT 1 FROM public.player_profiles pp
@@ -59,8 +67,8 @@ const ROW_SQL = `
             ($5 = 'spy'        AND g.resistance_win = FALSE)
           ))
       AND ($6::text IS NULL OR g.outcome_type = $6)
-      AND ($7::int IS NULL OR (SELECT COUNT(*)::int FROM jsonb_object_keys(g.players)) >= $7)
-      AND ($8::int IS NULL OR (SELECT COUNT(*)::int FROM jsonb_object_keys(g.players)) <= $8)
+      AND ($7::int IS NULL OR pc.player_count >= $7)
+      AND ($8::int IS NULL OR pc.player_count <= $8)
     ORDER BY g.end_timestamp DESC, g.id DESC
     LIMIT $9 OFFSET $10;
 `;
@@ -68,6 +76,9 @@ const ROW_SQL = `
 const COUNT_SQL = `
     SELECT COUNT(*)::int AS total
     FROM public.games g
+    CROSS JOIN LATERAL (
+        SELECT COUNT(*)::int AS player_count FROM jsonb_object_keys(g.players)
+    ) pc
     WHERE g.end_timestamp IS NOT NULL
       AND ($1::text IS NULL OR EXISTS (
             SELECT 1 FROM public.player_profiles pp
@@ -82,8 +93,8 @@ const COUNT_SQL = `
             ($5 = 'spy'        AND g.resistance_win = FALSE)
           ))
       AND ($6::text IS NULL OR g.outcome_type = $6)
-      AND ($7::int IS NULL OR (SELECT COUNT(*)::int FROM jsonb_object_keys(g.players)) >= $7)
-      AND ($8::int IS NULL OR (SELECT COUNT(*)::int FROM jsonb_object_keys(g.players)) <= $8);
+      AND ($7::int IS NULL OR pc.player_count >= $7)
+      AND ($8::int IS NULL OR pc.player_count <= $8);
 `;
 
 export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: FastifyReply) => {

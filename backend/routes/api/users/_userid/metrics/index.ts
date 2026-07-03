@@ -1,13 +1,13 @@
 import {FastifyInstance, FastifyReply, FastifyRequest, RouteHandler}  from "fastify";
 import {queryAll} from "../../../../../utils/db.js";
+import {computeRoS_G, computeRoI_G} from "../../../../../game/metrics/perGameComplex.js";
+import {TtlCache} from "../../../../../utils/ttlCache.js";
 
 type Get = {
     Params: {
         userid: number;
     };
 };
-
-type SuspicionTuple = [number, number];
 
 export interface MetricsRow {
     game_id: number;
@@ -74,15 +74,6 @@ const metricsQuery = `
 
 
 export const SPY_ROLES: ReadonlySet<string> = new Set(['spy', 'assassin', 'false-commander', 'deep-cover', 'blind-spy']);
-
-/**
- * Returns the number of spies in a game given the players JSONB object.
- * The players column is a jsonb map of {[userid]: role | null}.
- */
-function countSpiesInGame(players: Record<string, string | null>): number {
-    return Object.values(players).filter((role) => role !== null && SPY_ROLES.has(role)).length;
-}
-
 
 interface ComplexMetrics {
     counts: {
@@ -154,7 +145,7 @@ export function computeMetrics(
     let RoP_denominator = 0;
 
 
-    const roiByGame = new Map<number, {spyCount: number; totalR: number; userWeightedSum: number}>();
+    const roiByGame = new Map<number, number>();
 
     let RoIF_missions = 0;
     let RoIF_proposals = 0;
@@ -169,7 +160,6 @@ export function computeMetrics(
         const players: Record<string, string | null> = gameRounds[0]!.players ?? {};
         const userRole: string | null = players[userid] ?? null;
         const userIsSpy = userRole !== null && SPY_ROLES.has(userRole);
-        const spyCount = countSpiesInGame(players);
         const resistance_win: boolean | null = gameRounds[0]!.resistance_win;
 
         if (resistance_win !== null) {
@@ -180,30 +170,13 @@ export function computeMetrics(
             else totalGamesAsResistance++;
         }
 
-        // ROS
+        // RoS — lifetime is the average of the per-game RoS. Delegates to
+        // the single canonical implementation in perGameComplex.ts (clamped
+        // gamma, empty slots skipped, spyCount-normalized divisor) so this
+        // endpoint and the per-game endpoint can never disagree.
         if (!userIsSpy) {
-            const V: SuspicionTuple[] = [];
-            let roundsWhereUserVoted = 0;
-
-            for (const row of gameRounds) {
-                const suspicions: Record<string, Record<string, number>> | null = row.suspicions;
-                if (!suspicions) continue;
-                const myVotes = suspicions[userid];
-                if (!myVotes) continue;
-
-                roundsWhereUserVoted++;
-
-                for (const [targetId, gamma] of Object.entries(myVotes)) {
-                    const targetRole = players[targetId] ?? null;
-                    const targetIsSpy = targetRole !== null && SPY_ROLES.has(targetRole);
-                    const c = targetIsSpy ? 1 : -1;
-                    V.push([c, gamma as number]);
-                }
-            }
-
-            if (V.length > 0) {
-                const sum = V.reduce((acc, [c, gamma]) => acc + c * gamma, 0);
-                const RoS_G = sum / (5 * spyCount * roundsWhereUserVoted);
+            const RoS_G = computeRoS_G(userid, gameRounds);
+            if (RoS_G !== null) {
                 RoS_G_sum += RoS_G;
                 RoS_game_count++;
             }
@@ -232,26 +205,12 @@ export function computeMetrics(
             }
         }
 
-        // RoI
+        // RoI — same unification as RoS: one canonical per-game function.
+        // Games with no usable suspicion records return null and are
+        // excluded from the lifetime average.
         if (userIsSpy) {
-            let totalR = 0;
-            let userWeightedSum = 0;
-
-            for (const row of gameRounds) {
-                const suspicions: Record<string, Record<string, number>> | null = row.suspicions;
-                if (!suspicions) continue;
-
-                for (const [, votes] of Object.entries(suspicions)) {
-                    for (const [targetId, gamma] of Object.entries(votes)) {
-                        totalR++;
-                        if (targetId === userid) {
-                            userWeightedSum += gamma as number;
-                        }
-                    }
-                }
-            }
-
-            roiByGame.set(game_id, { spyCount, totalR, userWeightedSum });
+            const RoI_G = computeRoI_G(userid, gameRounds);
+            if (RoI_G !== null) roiByGame.set(game_id, RoI_G);
         }
 
         // RoIF
@@ -270,14 +229,11 @@ export function computeMetrics(
         }
     }
 
-    // RoI_L
+    // RoI_L — average of per-game RoI over games where it's defined.
     let RoI_L: number | null = null;
     if (roiByGame.size > 0) {
         let RoI_G_sum = 0;
-        for (const { spyCount, totalR, userWeightedSum } of roiByGame.values()) {
-            const RoI_G = totalR > 0 ? 1 - (spyCount / (5 * totalR)) * userWeightedSum : 1;
-            RoI_G_sum += RoI_G;
-        }
+        for (const RoI_G of roiByGame.values()) RoI_G_sum += RoI_G;
         RoI_L = RoI_G_sum / roiByGame.size;
     }
 
@@ -313,22 +269,28 @@ const lifetimePointsQuery = `
     GROUP BY side;
 `;
 
+// Lifetime metrics walk a user's entire round history per request; a short
+// TTL absorbs bursts (profile page fires several of these at once).
+const userMetricsCache = new TtlCache<ComplexMetrics>(30_000);
+
 export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: FastifyReply) => {
     try {
         const userid = req.params.userid;
 
-        const [rounds, points] = await Promise.all([
-            queryAll<MetricsRow>(metricsQuery, [userid.toString()]),
-            queryAll<{ side: 'resistance' | 'spy'; total: number }>(lifetimePointsQuery, [userid]),
-        ]);
+        const metrics = await userMetricsCache.getOrCompute(String(userid), async () => {
+            const [rounds, points] = await Promise.all([
+                queryAll<MetricsRow>(metricsQuery, [userid.toString()]),
+                queryAll<{ side: 'resistance' | 'spy'; total: number }>(lifetimePointsQuery, [userid]),
+            ]);
 
-        const lifetimePoints = { resistance: 0, spy: 0 };
-        for (const row of points) {
-            if (row.side === 'resistance') lifetimePoints.resistance = Number(row.total);
-            else if (row.side === 'spy')   lifetimePoints.spy        = Number(row.total);
-        }
+            const lifetimePoints = { resistance: 0, spy: 0 };
+            for (const row of points) {
+                if (row.side === 'resistance') lifetimePoints.resistance = Number(row.total);
+                else if (row.side === 'spy')   lifetimePoints.spy        = Number(row.total);
+            }
 
-        const metrics = computeMetrics(userid.toString(), rounds, lifetimePoints);
+            return computeMetrics(userid.toString(), rounds, lifetimePoints);
+        });
 
         rep.code(200).send(metrics);
     } catch (error) {

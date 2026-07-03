@@ -70,10 +70,8 @@ describe('GET /api/users ?q= (substring search path)', () => {
 
         const res = await server.inject({ method: 'GET', url: '/api/users' });
         expect(res.statusCode).toBe(200);
-        // The legacy SQL has no positional args (it's a SELECT * FROM
-        // table at verbosity 0). The helper was called with the SQL
-        // string alone — no params array.
+        // The all-users path is paginated: default LIMIT 50, OFFSET 0.
         const [, args] = vi.mocked(db.queryAll).mock.calls[0]!;
-        expect(args).toBeUndefined();
+        expect(args).toEqual([50, 0]);
     });
 });

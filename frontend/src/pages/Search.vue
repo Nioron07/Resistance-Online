@@ -246,18 +246,13 @@
     searchGames,
     searchPlayers,
   } from '@/services/api'
+  import { GAME_OUTCOME_TYPES } from '@/types/gameEvents'
 
   type Tab = 'player' | 'game'
 
-  /**
-   * Outcome strings emitted by `ResistanceCore.ts` today. Hard-coded
-   * because Postgres doesn't expose them as an enum. Update this when a
-   * new outcome reason is added server-side.
-   */
-  const OUTCOME_TYPES = [
-    { title: 'Mission Victory', value: 'mission-victory' },
-    { title: 'Nomination Limit', value: 'nomination-limit' },
-  ]
+  // Shared with the rest of the event contract — single place to update
+  // when the backend adds an outcome reason.
+  const OUTCOME_TYPES = [...GAME_OUTCOME_TYPES]
 
   const route = useRoute()
   const router = useRouter()
@@ -311,39 +306,51 @@
   }
 
   // ----- Player search -----
+  // Abort the previous in-flight request whenever a new one fires so a
+  // slow earlier response can't overwrite a newer one.
+  let playerAbort: AbortController | null = null
   async function runPlayerSearch () {
     const q = (playerQ.value ?? '').trim()
+    playerAbort?.abort()
     if (!q) {
       playerResults.value = []
       return
     }
+    const abort = new AbortController()
+    playerAbort = abort
     playerLoading.value = true
     error.value = ''
     try {
-      playerResults.value = await searchPlayers(q)
+      playerResults.value = await searchPlayers(q, { signal: abort.signal })
     } catch (error_) {
+      if ((error_ as Error).name === 'AbortError') return
       error.value = (error_ as Error).message
       playerResults.value = []
     } finally {
-      playerLoading.value = false
+      if (playerAbort === abort) playerLoading.value = false
     }
   }
 
   // ----- Game search -----
+  let gameAbort: AbortController | null = null
   async function runGameSearch () {
+    gameAbort?.abort()
+    const abort = new AbortController()
+    gameAbort = abort
     gameLoading.value = true
     error.value = ''
     try {
       const payload = normalizeFilters(gameFilters)
-      const res = await searchGames(payload)
+      const res = await searchGames(payload, { signal: abort.signal })
       gameResults.value = res.rows
       gameTotal.value = res.total
     } catch (error_) {
+      if ((error_ as Error).name === 'AbortError') return
       error.value = (error_ as Error).message
       gameResults.value = []
       gameTotal.value = 0
     } finally {
-      gameLoading.value = false
+      if (gameAbort === abort) gameLoading.value = false
     }
   }
 
@@ -383,10 +390,18 @@
   }
 
   // ----- Reactive triggers -----
-  watch(playerQ, () => debounce(runPlayerSearch, 250))
+  // One watcher per source handles BOTH side effects (fire the search and
+  // mirror state into the URL) so each change only clones/compares once.
+  watch(playerQ, () => {
+    debounce(runPlayerSearch, 250)
+    syncUrl()
+  })
   watch(
     () => ({ ...gameFilters }),
-    () => debounce(runGameSearch, 300),
+    () => {
+      debounce(runGameSearch, 300)
+      syncUrl()
+    },
     { deep: true },
   )
 
@@ -411,8 +426,6 @@
     router.replace({ path: '/Search', query: q })
   }
   watch(activeTab, syncUrl)
-  watch(playerQ, syncUrl)
-  watch(() => ({ ...gameFilters }), syncUrl, { deep: true })
 
   function setTab (t: Tab) {
     if (activeTab.value === t) return

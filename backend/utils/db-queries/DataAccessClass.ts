@@ -170,7 +170,7 @@ export abstract class DAC {
                                             return undefined as unknown as QueryResult<QueryResultRow>; // Typescript typing is a truly mysterious thing
                                         }
 
-                                        client.query(DAC.queries.resistance.games.id.playerId.update_last_played, [userid as number]);
+                                        await client.query(DAC.queries.resistance.games.id.playerId.update_last_played, [userid as number]);
                                         return client.query(DAC.queries.resistance.games.id.playerId.add_update, [gameid, { [userid]: null }]);
                                     })) === undefined ? 'exists' : 'added';
                                 });
@@ -193,9 +193,9 @@ export abstract class DAC {
                              */
                             async update(role: RoleName): Promise<'updated' | null> {
                                 return DAC.run<Promise<'updated'>>(async () => {
-                                    await db.transaction((client: PoolClient): Promise<QueryResult<QueryResultRow>> => {
-                                        return client.query(DAC.queries.resistance.games.id.playerId.add_update, [gameid, {[userid]: role}]);
-                                    });
+                                    // Single statement — no transaction needed
+                                    // (this runs on the game hot path).
+                                    await db.query(DAC.queries.resistance.games.id.playerId.add_update, [gameid, {[userid]: role}]);
 
                                     return 'updated';
                                 })
@@ -216,10 +216,9 @@ export abstract class DAC {
                              */
                             async remove(): Promise<'removed' | null> {
                                 return DAC.run<Promise<'removed'>>(async () => {
-                                    await db.transaction((client: PoolClient): Promise<QueryResult<QueryResultRow>> => {
-                                        return client.query(DAC.queries.resistance.games.id.playerId.remove, [gameid, userid.toString() as string]);
-                                    });
-    
+                                    // Single statement — no transaction needed.
+                                    await db.query(DAC.queries.resistance.games.id.playerId.remove, [gameid, userid.toString() as string]);
+
                                     return 'removed'
                                 });
                             }
@@ -255,8 +254,10 @@ export abstract class DAC {
                     async start(): Promise<'started' | null> {
                         return DAC.run<Promise<'started'>>(async () => {
                             await db.transaction(async (client: PoolClient) => {
-                                client.query(DAC.queries.resistance.games.id.start, [gameid]);
-                                return undefined as unknown as QueryResult<QueryResultRow>;
+                                // Must be awaited: callers rely on start()
+                                // resolving only after the row is actually
+                                // committed (see LobbyPlugin game:start).
+                                return await client.query(DAC.queries.resistance.games.id.start, [gameid]);
                             });
                             return 'started';
                         });
@@ -320,11 +321,36 @@ export abstract class DAC {
                                             && role !== undefined
                                             && winningTeam === teamOf(role);
 
+                                        // Lifetime counters from the whitepaper's
+                                        // raw per-player metadata: losses, per-role
+                                        // counts, times as leader / on a mission /
+                                        // selected for a team. Accumulated
+                                        // additively into overall_metrics.
+                                        const userid = String(playerId);
+                                        let timesLeader = 0;
+                                        let timesSelectedForTeam = 0;
+                                        let timesOnMission = 0;
+                                        for (const row of pointsRows) {
+                                            if (String(row.leader_userid) === userid) timesLeader++;
+                                            if ((row.mission_participent_userids ?? []).map(String).includes(userid)) {
+                                                timesSelectedForTeam++;
+                                                if (row.vote_status === true) timesOnMission++;
+                                            }
+                                        }
+                                        const increments: Record<string, number> = {
+                                            timesLeader,
+                                            timesSelectedForTeam,
+                                            timesOnMission,
+                                        };
+                                        if (winningTeam !== null && !player_won) increments.losses = 1;
+                                        if (role !== undefined) increments[`role_${role}`] = 1;
+
                                         queries.push(client.query(DAC.queries.resistance.games.id.end.playerProfile, [
                                             playerId,
                                             date,
                                             player_won ? 1 : 0,
                                             { [gameid]: player_won },
+                                            increments,
                                         ]));
                                     }
 
@@ -404,10 +430,11 @@ export abstract class DAC {
                         ? buildMissionCardsRecord(lastMission.cards)
                         : null;
                 return DAC.run(async () => {
-                    return (await db.transaction<QueryResult<{ id: number }>>((client: PoolClient): Promise<QueryResult<{ id: number }>> => {
-                        const lastNomination = state_copy.pendingNominations.at(-1);
+                    const lastNomination = state_copy.pendingNominations.at(-1);
 
-                        return client.query(DAC.queries.resistance.rounds.create, [
+                    // Single INSERT — a transaction wrapper here just adds
+                    // BEGIN/COMMIT round-trips on every resolved round.
+                    return (await db.query<{ id: number }>(DAC.queries.resistance.rounds.create, [
                             gameid,                                                                     // voting_rounds.game_id
                             state_copy.leaderId,                                                        // voting_rounds.leader_userid
                             lastNomination?.proposedTeam,                                               // voting_rounds.mission_participent_userids
@@ -419,9 +446,7 @@ export abstract class DAC {
                             lastNomination?.outcome === undefined ? {} : state_copy.pendingVotes,       // voting_rounds.mission_details
                             state_copy.pendingSuspicions,                                               // voting_rounds.suspicions
                             missionCards                                                                // voting_rounds.mission_cards
-                        ]);
-
-                    })).rows[0]!.id;
+                    ])).rows[0]!.id;
                 });
             },
             
@@ -456,14 +481,16 @@ export abstract class DAC {
          * @async
          * @function
          * 
-         * Function that returns the profiles of all users
+         * Function that returns the profiles of all users, paginated.
          *
          * @param { ProfileVerbosity } verbosity `ProfileVerbosity` The verbosity level to return the profiles at
+         * @param { number } limit  Max rows returned (caller is expected to clamp).
+         * @param { number } offset Rows to skip.
          * @returns { Promise<QueryResultRow | null> } A promise containing the requested profile
          * @throws `Error` The caller of this function must handle the possibility of an error.
          */
-        async get(verbosity: ProfileVerbosity): Promise<QueryResultRow[] | null> {
-            return await db.queryAll<QueryResultRow>(DAC.queries.users.get[verbosity]!);
+        async get(verbosity: ProfileVerbosity, limit: number = 100, offset: number = 0): Promise<QueryResultRow[] | null> {
+            return await db.queryAll<QueryResultRow>(DAC.queries.users.get[verbosity]!, [limit, offset]);
         },
 
         /**
@@ -670,12 +697,28 @@ export abstract class DAC {
                                     end_timestamp = $6::timestamptz
                                 WHERE id = $1;`,
     
+                        /**
+                         * $5 is a jsonb map of counter increments (e.g.
+                         * {"timesLeader": 2, "role_spy": 1, "losses": 1}).
+                         * Each key is added to the existing counter in
+                         * overall_metrics; keys not present in $5 are left
+                         * untouched.
+                         */
                         playerProfile: `UPDATE player_profiles SET
                                             count_games = count_games + 1,
                                             last_online = $2::timestamptz,
                                             count_games_won = count_games_won + (1 * $3),
                                             game_metrics = game_metrics || $4::jsonb,
-                                            overall_metrics = overall_metrics       -- placeholder for later
+                                            overall_metrics = COALESCE(overall_metrics, '{}'::jsonb) || (
+                                                SELECT COALESCE(
+                                                    jsonb_object_agg(
+                                                        t.k,
+                                                        to_jsonb(COALESCE((COALESCE(overall_metrics, '{}'::jsonb)->>t.k)::numeric, 0) + t.v::numeric)
+                                                    ),
+                                                    '{}'::jsonb
+                                                )
+                                                FROM jsonb_each_text($5::jsonb) AS t(k, v)
+                                            )
                                         WHERE id = $1;`,
 
                         playerGameMetrics: `INSERT INTO player_game_metrics
@@ -702,24 +745,42 @@ export abstract class DAC {
         },
 
         users: {
+            /**
+             * @note All verbosities paginate ($1 = LIMIT, $2 = OFFSET) and
+             * none of them ever return the raw `connections` JSONB — it
+             * contains the full OAuth/Steam provider profile (PII). Only the
+             * provider→uid mapping is exposed, and only at verbosity >= 1.
+             * The uid map is built with a scalar subquery (not CROSS JOIN)
+             * so profiles with no connections aren't silently dropped.
+             */
             get: [
                 `SELECT
                     id, username, pfp, bio,
                     last_played
-                FROM public.player_profiles;
+                FROM public.player_profiles
+                ORDER BY id
+                LIMIT $1 OFFSET $2;
                 `,
                 `SELECT
                     p.id, p.username, p.pfp, p.bio, p.friends,
                     p.count_games, p.count_games_won, p.game_metrics, p.overall_metrics,
-                    jsonb_object_agg(e.key, e.value->'uid') AS connections,
+                    (SELECT COALESCE(jsonb_object_agg(e.key, e.value->'uid'), '{}'::jsonb)
+                       FROM jsonb_each(p.connections) e) AS connections,
                     p.last_played, p.creation_date
                 FROM public.player_profiles p
-                CROSS JOIN jsonb_each(p.connections) e
-                GROUP BY id;
+                ORDER BY p.id
+                LIMIT $1 OFFSET $2;
                 `,
                 `SELECT
-                    *
-                FROM public.player_profiles;
+                    p.id, p.username, p.pfp, p.bio, p.friends,
+                    p.username_set,
+                    p.count_games, p.count_games_won, p.game_metrics, p.overall_metrics,
+                    (SELECT COALESCE(jsonb_object_agg(e.key, e.value->'uid'), '{}'::jsonb)
+                       FROM jsonb_each(p.connections) e) AS connections,
+                    p.last_played, p.creation_date
+                FROM public.player_profiles p
+                ORDER BY p.id
+                LIMIT $1 OFFSET $2;
                 `
             ],
             create: `INSERT INTO
@@ -757,16 +818,20 @@ export abstract class DAC {
                         p.id, p.username, p.pfp, p.bio, p.friends,
                         p.username_set,
                         p.count_games, p.count_games_won, p.game_metrics, p.overall_metrics,
-                        jsonb_object_agg(e.key, e.value->'uid') AS connections,
+                        (SELECT COALESCE(jsonb_object_agg(e.key, e.value->'uid'), '{}'::jsonb)
+                           FROM jsonb_each(p.connections) e) AS connections,
                         p.last_played, p.creation_date
                     FROM public.player_profiles p
-                    CROSS JOIN jsonb_each(p.connections) e
-                    WHERE id = $1
-                    GROUP BY id;
+                    WHERE id = $1;
                     `,
                     `SELECT
-                        *
-                    FROM public.player_profiles
+                        p.id, p.username, p.pfp, p.bio, p.friends,
+                        p.username_set,
+                        p.count_games, p.count_games_won, p.game_metrics, p.overall_metrics,
+                        (SELECT COALESCE(jsonb_object_agg(e.key, e.value->'uid'), '{}'::jsonb)
+                           FROM jsonb_each(p.connections) e) AS connections,
+                        p.last_played, p.creation_date
+                    FROM public.player_profiles p
                     WHERE id = $1;
                     `
                 ]
@@ -800,16 +865,20 @@ export abstract class DAC {
                 `SELECT
                     p.id, p.username, p.pfp, p.bio, p.friends,
                     p.count_games, p.count_games_won, p.game_metrics, p.overall_metrics,
-                    jsonb_object_agg(e.key, e.value->'uid') AS connections,
+                    (SELECT COALESCE(jsonb_object_agg(e.key, e.value->'uid'), '{}'::jsonb)
+                       FROM jsonb_each(p.connections) e) AS connections,
                     p.last_played, p.creation_date
                 FROM public.player_profiles p
-                CROSS JOIN jsonb_each(p.connections) e
-                WHERE id = ANY($1::bigint[])
-                GROUP BY id;
+                WHERE id = ANY($1::bigint[]);
                 `,
                 `SELECT
-                    *
-                FROM public.player_profiles
+                    p.id, p.username, p.pfp, p.bio, p.friends,
+                    p.username_set,
+                    p.count_games, p.count_games_won, p.game_metrics, p.overall_metrics,
+                    (SELECT COALESCE(jsonb_object_agg(e.key, e.value->'uid'), '{}'::jsonb)
+                       FROM jsonb_each(p.connections) e) AS connections,
+                    p.last_played, p.creation_date
+                FROM public.player_profiles p
                 WHERE id = ANY($1::bigint[]);
                 `
             ],

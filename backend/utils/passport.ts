@@ -1,6 +1,7 @@
 import 'dotenv/config'
 
 import { Authenticator } from "@fastify/passport";
+import { DAC } from "./db-queries/DataAccessClass.js";
 
 declare module 'fastify' {
   interface PassportUser {
@@ -10,18 +11,18 @@ declare module 'fastify' {
 
 export const passport = new Authenticator();
 
-// Only Store the username as the identifier in the session
-passport.registerUserSerializer(async (user: unknown, _req) => {
-  return user; // @TODO: Test if this works. This assumes that user.id is what we want as our database uses username as the primary key.
+// Store only the userid in the session — never the whole user object.
+passport.registerUserSerializer(async (user: { userid: number }, _req) => {
+  return user.userid;
 });
 
-// Grab the user information from the db
-passport.registerUserDeserializer(async (user: string, _req) => {
-  // const user_info = {
-  //   username: username,
-  // }; // @TODO: Actually replace with the sql call
-
-  return user;
+// Re-validate against the DB on every session restore so deleted users
+// don't keep working sessions. Returning null fails deserialization and
+// the request proceeds unauthenticated.
+passport.registerUserDeserializer(async (userid: number, _req) => {
+  const profile = await DAC.users.id(userid).get(0);
+  if (!profile) return null;
+  return { userid };
 });
 
 // ------------------- ------------------- Register the Passport Strategies for SSO ------------------- ------------------- \\

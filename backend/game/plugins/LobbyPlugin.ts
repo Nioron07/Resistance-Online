@@ -105,12 +105,17 @@ export class LobbyPlugin extends GamePlugin {
             if (state.phase !== 'lobby') return;
             if (e.senderId !== this.room.host) return;
 
-            state.config.modulesEnabled = e.modulesEnabled;
-            state.config.optionalRoles = e.optionalRoles;
-          
+            if (e.modulesEnabled !== undefined) state.config.modulesEnabled = e.modulesEnabled;
+            if (e.optionalRoles !== undefined) state.config.optionalRoles = e.optionalRoles;
+
+            this.room.broadcast("game:configured", {
+                modulesEnabled: [...state.config.modulesEnabled],
+                optionalRoles: [...state.config.optionalRoles],
+            });
+
             await DAC.resistance.games.id(meta_data.gameid).updateSettings({
-                modulesEnabled: e.modulesEnabled,
-                optionalRoles: e.optionalRoles
+                modulesEnabled: state.config.modulesEnabled,
+                optionalRoles: state.config.optionalRoles
             });
         });
 
@@ -123,6 +128,17 @@ export class LobbyPlugin extends GamePlugin {
             if (!allConnected) {
                 const disconnected = [...state.players.values()].filter(p => !p.connected).map(p => p.playerId);
                 this.room.send(this.room.players.get(this.room.host!)!, "socket:error", {message: `Cannot start: players disconnected: ${disconnected.join(', ')}`});
+                return;
+            }
+
+            // The client-sent seatOrder must be a permutation of the actual
+            // player set and the leader must be one of them — otherwise a
+            // buggy/malicious host could inject foreign ids or drop players
+            // and corrupt leader rotation.
+            if (e.seatOrder.length !== state.players.size
+                || e.seatOrder.some(id => !state.players.has(id))
+                || !e.seatOrder.includes(e.leaderId)) {
+                this.room.send(this.room.players.get(this.room.host!)!, "socket:error", {message: 'Invalid seat order or leader for game start.'});
                 return;
             }
 
@@ -139,88 +155,8 @@ export class LobbyPlugin extends GamePlugin {
              * - Joseph Habisohn 4/26/2026
              */
             await DAC.resistance.games.id(meta_data.gameid).start();
-          
+
             this.room.broadcast("game:started", {});
         });
-
-        // If we choose to have automatic role assignment we can use this
-        //     bus.on("game:start", 999, e => {
-        //         if (state.phase !== 'lobby') return;
-        //         if (e.senderId !== this.room.host) return;
-        //         if (this.room.players.size < MIN_PLAYERS) return;
-        //
-        //         state.config.playerCount = this.room.players.size;
-        //         state.rules = getRulesFor(state.config.playerCount);
-        //
-        //         this.room.broadcast("game:started", {});
-        //
-        //         bus.emit("roles:assigned", { assignments: this.assignRoles(state) });
-        //     });
-        // }
-        //
-        // private assignRoles(state: ResistanceState): Record<PlayerId, RoleName> {
-        //     const playerIds = Object.keys(state.players);
-        //     const rules = state.rules!;
-        //     const optionalRoles = state.config.optionalRoles;
-        //
-        //     const playerShuffled = this.shuffleArray(playerIds);
-        //     const rolesShuffled = this.shuffleArray(optionalRoles);
-        //
-        //     const assignments: Record<PlayerId, RoleName> = {};
-        //
-        //     const spies: RoleName[] = []
-        //     const resistance: RoleName[] = [];
-        //
-        //     /**
-        //      * @note Right now assassin module always has commander/assassin. This could be changed in the future if we want.
-        //      * - Eric Brewster 03/23/26
-        //      */
-        //     if (state.config.modulesEnabled.includes("assassin")) {
-        //         resistance.push('commander');
-        //         spies.push('assassin');
-        //     }
-        //
-        //     const spyCount = rules.spyCount;
-        //     const resistanceCount = state.config.playerCount - rules.spyCount;
-        //
-        //     for (const role of rolesShuffled) {
-        //         if (teamOf(role) === 'spy' && spies.length < spyCount) {
-        //             spies.push(role);
-        //         } else if (resistance.length < resistanceCount) {
-        //             resistance.push(role);
-        //         }
-        //     }
-        //
-        //     while (spies.length < spyCount) spies.push('spy' as RoleName);
-        //     while (resistance.length < resistanceCount) resistance.push('resistance' as RoleName);
-        //
-        //     const allRoles = [...spies, ...resistance];
-        //
-        //     for (let i: number = 0; i < playerShuffled.length; i++) {
-        //         // assert here that allRoles[i] is defined since it should always be the same length as playerShuffled
-        //         assignments[playerShuffled[i] as PlayerId] = allRoles[i]!;
-        //     }
-        //
-        //     return assignments;
-        // }
-        //
-        // /**
-        //  * Fisher-Yates shuffle
-        //  * @param array
-        //  */
-        // private shuffleArray<T>(array: T[]): T[] {
-        //     let a = [...array]
-        //     let currentIndex = a.length;
-        //     let randomIndex: number;
-        //
-        //     while (currentIndex !== 0) {
-        //         randomIndex = Math.floor(Math.random() * currentIndex);
-        //         currentIndex--;
-        //
-        //         [a[currentIndex], a[randomIndex]] = [a[randomIndex]!, a[currentIndex]!];
-        //     }
-        //
-        //     return a;
-        // }
     }
 }

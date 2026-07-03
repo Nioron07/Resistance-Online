@@ -30,9 +30,11 @@ export function getPool(): Pool {
   if (!pool) {
     pool = new Pool(dbConfig)
 
+    // An idle client erroring (network blip, server-side timeout) is
+    // recoverable — the pool discards the client and dials a new one on the
+    // next checkout. Crashing here would kill every active game room.
     pool.on('error', (err) => {
       console.error('Unexpected error on idle client', err)
-      process.exit(-1)
     })
 
     // Log pool events in development

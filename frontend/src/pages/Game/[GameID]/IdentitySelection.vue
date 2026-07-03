@@ -4,7 +4,8 @@
       <header class="r-phase-header">
         <div class="r-phase-eyebrow">PHASE · ROLE</div>
         <h1 class="r-phase-title">SELECT YOUR IDENTITY</h1>
-        <p class="r-phase-sub">Order randomized — be discrete.</p>
+        <p class="r-phase-sub">Report the role card you were dealt. Order randomized — be discrete.</p>
+        <p v-if="game.roleResetMessage" class="r-reset-warning mt-2">{{ game.roleResetMessage }}</p>
       </header>
 
       <div class="r-identity-grid">
@@ -77,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-  import { ref } from 'vue'
+  import { ref, watch } from 'vue'
   import { useGameStore } from '@/stores/game'
 
   const game = useGameStore()
@@ -85,6 +86,14 @@
   const dialog = ref(false)
   const selectedChoice = ref('')
   const submitted = ref(false)
+
+  // Server rejected the table's self-reported composition — everyone
+  // re-selects.
+  watch(() => game.roleResetNonce, () => {
+    submitted.value = false
+    selectedChoice.value = ''
+    dialog.value = false
+  })
 
   function confirmChoice (choice: string) {
     selectedChoice.value = choice
@@ -159,6 +168,13 @@
 .r-confirm-body {
   text-align: center;
   font-size: 0.95rem;
+  margin: 0;
+}
+
+.r-reset-warning {
+  font-size: 0.8rem;
+  color: var(--r-warning, #f59e0b);
+  letter-spacing: 0.04em;
   margin: 0;
 }
 </style>

@@ -51,6 +51,73 @@ export function computeIndices(rows: PointsRow[], weighting: WeightingStrategy):
     };
 }
 
+export interface HistoryInputRow extends PointsRow {
+    gameid: number;
+    endTimestamp: string;
+}
+
+export interface IndexHistoryPoint {
+    gameid: number;
+    endTimestamp: string;
+    side: 'resistance' | 'spy';
+    /** Points earned in this game. */
+    points: number;
+    /** Indices as of (and including) this game. */
+    rIndex: number | null;
+    sIndex: number | null;
+    pIndex: number | null;
+}
+
+/**
+ * Per-game index trajectory: for each game (chronological), the R/S/P
+ * indices computed over every game up to and including it — i.e. what the
+ * player's rating chart looks like over time.
+ *
+ * Computed incrementally in O(N): for expdecay the prefix weighted mean
+ * satisfies sumW ← α·sumW + 1, sumP ← α·sumP + p, mean = sumP/sumW, which
+ * is exactly weightedMean() on the prefix.
+ */
+export function computeIndexHistory(rows: HistoryInputRow[], weighting: WeightingStrategy): IndexHistoryPoint[] {
+    const alpha = weighting.strategy === 'expdecay' ? clampAlpha(weighting.alpha) : 1;
+
+    // Running per-side accumulators. alpha === 1 (or uniform) degenerates
+    // to a plain mean; alpha === 0 to "most recent game only".
+    const acc = {
+        resistance: { sumW: 0, sumP: 0, mean: null as number | null },
+        spy:        { sumW: 0, sumP: 0, mean: null as number | null },
+    };
+
+    const history: IndexHistoryPoint[] = [];
+    for (const row of rows) {
+        const a = acc[row.side];
+        if (alpha === 0) {
+            a.mean = row.points;
+        } else {
+            a.sumW = alpha * a.sumW + 1;
+            a.sumP = alpha * a.sumP + row.points;
+            a.mean = a.sumP / a.sumW;
+        }
+
+        const rIndex = acc.resistance.mean;
+        const sIndex = acc.spy.mean;
+        // Same one-sided fallback as computeIndices.
+        const pIndex = rIndex !== null && sIndex !== null
+            ? (rIndex + sIndex) / 2
+            : rIndex ?? sIndex;
+
+        history.push({
+            gameid: row.gameid,
+            endTimestamp: row.endTimestamp,
+            side: row.side,
+            points: row.points,
+            rIndex,
+            sIndex,
+            pIndex,
+        });
+    }
+    return history;
+}
+
 /**
  * Normalized weighted mean. `points` is in chronological order (oldest
  * first); recency weighting peaks at the last index.

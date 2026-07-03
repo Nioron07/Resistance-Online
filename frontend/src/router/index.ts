@@ -15,8 +15,6 @@ const router = createRouter({
   routes: setupLayouts(routes),
 })
 
-let firstAuthChecked = false
-
 /**
  * Auth gate. Run before every navigation; nothing renders for an
  * unauthenticated visitor outside of /Login/*. Also enforces the
@@ -25,21 +23,10 @@ let firstAuthChecked = false
 router.beforeEach(async to => {
   const appStore = useAppStore()
 
-  // Lazily kick off the first /auth/me fetch. Only awaited once.
-  if (!firstAuthChecked) {
-    firstAuthChecked = true
-    await appStore.fetchUser()
-  } else if (appStore.loading) {
-    // Another navigation is mid-flight — wait it out so we don't race.
-    await new Promise<void>(resolve => {
-      const tick = setInterval(() => {
-        if (!appStore.loading) {
-          clearInterval(tick)
-          resolve()
-        }
-      }, 20)
-    })
-  }
+  // fetchUser dedupes internally: the first navigation does the /auth/me
+  // request, concurrent navigations share the same in-flight promise, and
+  // later ones return immediately from the cached result.
+  await appStore.fetchUser()
 
   const path = to.path
   const isLoginRoute = path.startsWith('/Login/')

@@ -66,6 +66,18 @@
         />
       </section>
 
+      <!-- Index history -->
+      <section v-if="(indexBundle?.history?.length ?? 0) >= 2" class="r-index-history">
+        <header class="r-game-log-header">
+          <h2 class="r-section-title">INDEX HISTORY</h2>
+          <span class="r-section-meta">{{ indexBundle!.history.length }} GAMES</span>
+        </header>
+
+        <v-card class="r-history-card pa-4">
+          <IndexHistoryChart :history="indexBundle!.history" />
+        </v-card>
+      </section>
+
       <!-- Resistance / Spy split -->
       <section class="r-grid-split">
         <v-card class="r-split-card r-card-hover side-resistance pa-5">
@@ -161,6 +173,7 @@
 <script setup lang="ts">
   import { computed, onMounted, ref, watch } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
+  import IndexHistoryChart from '@/components/IndexHistoryChart.vue'
   import MetricCard from '@/components/MetricCard.vue'
   import MissionTracker from '@/components/MissionTracker.vue'
   import PlayerRoleTag from '@/components/PlayerRoleTag.vue'
@@ -227,7 +240,8 @@
    * Resolve the route's username → userid.
    * Strategy:
    *   1. If it matches the logged-in user, use appStore.user.id.
-   *   2. Otherwise, fall back to /api/users (verbosity=0) and find by username.
+   *   2. Otherwise, use the username search endpoint and pick the
+   *      case-insensitive exact match (search ranks it first).
    */
   async function resolveUserid (username: string): Promise<number | null> {
     await appStore.fetchUser()
@@ -235,10 +249,10 @@
       return appStore.user.id
     }
     try {
-      const res = await fetch('/api/users?verbosity=0', { credentials: 'include' })
+      const res = await fetch(`/api/users?q=${encodeURIComponent(username)}&limit=10`, { credentials: 'include' })
       if (!res.ok) return null
       const arr = (await res.json()) as Array<{ id: number, username: string, pfp: string | null }>
-      const match = arr.find(u => u.username === username)
+      const match = arr.find(u => u.username.toLowerCase() === username.toLowerCase())
       if (match) {
         profile.value = { pfp: match.pfp }
         return match.id
@@ -325,6 +339,12 @@
 }
 @media (max-width: 960px) { .r-grid-headline { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 480px) { .r-grid-headline { grid-template-columns: 1fr; } }
+
+.r-index-history { margin-bottom: 24px; }
+.r-history-card {
+  background-color: rgb(var(--v-theme-surface)) !important;
+  border: 1px solid rgb(var(--v-theme-border)) !important;
+}
 
 .r-grid-split {
   display: grid;

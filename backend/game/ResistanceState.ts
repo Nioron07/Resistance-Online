@@ -203,6 +203,62 @@ export class ResistanceState {
         return JSON.stringify(state);
     }
 
+    /**
+     * Serializes the redacted state for many recipients at once, building
+     * the shared (recipient-independent) parts a single time. Equivalent to
+     * calling serializeFor(id) per recipient, but a 10-player broadcast no
+     * longer redacts the missions/players structures 10 times over.
+     */
+    serializeForAll(recipientIds: PlayerId[]): Map<PlayerId, string> {
+        const showMissionAuthors = this.phase === 'game-over';
+        const showAssassination = this.phase === 'assassination' || this.phase === 'game-over';
+
+        const publicPlayers: Record<PlayerId, PlayerState> = {};
+        for (const [id, player] of this.players.entries()) {
+            publicPlayers[id] = {
+                playerId: player.playerId,
+                connected: player.connected,
+                plotCardsInHand: player.plotCardsInHand,
+                role: undefined,
+                knownRoles: undefined,
+            };
+        }
+
+        const shared: Omit<GameState, 'players'> = {
+            phase: this.phase,
+            mission: this.mission,
+            round: this.round,
+            leaderId: this.leaderId,
+            nominatedTeam: this.nominatedTeam,
+            missions: this.missions.map(mission => ({
+                ...mission,
+                cards: mission.cards.map(card => ({
+                    card: card.card,
+                    playerId: showMissionAuthors ? card.playerId : undefined,
+                })),
+            })),
+            spyWins: this.spyWins,
+            resistanceWins: this.resistanceWins,
+            winner: this.winner,
+            assassinationTarget: showAssassination ? this.assassinationTarget : null,
+            votedPlayerIds: Object.keys(this.pendingVotes).map(Number),
+            submittedSuspicionPlayerIds: Object.keys(this.pendingSuspicions).map(Number),
+            playedMissionCardPlayerIds: Object.keys(this.pendingMissionCards).map(Number),
+        };
+
+        const out = new Map<PlayerId, string>();
+        for (const id of recipientIds) {
+            const self = this.players.get(id);
+            if (!self) continue;
+            const players: Record<PlayerId, PlayerState> = {
+                ...publicPlayers,
+                [id]: { ...publicPlayers[id]!, role: self.role, knownRoles: self.knownRoles },
+            };
+            out.set(id, JSON.stringify({ ...shared, players }));
+        }
+        return out;
+    }
+
     toJSON() {
         return {
             ...this,

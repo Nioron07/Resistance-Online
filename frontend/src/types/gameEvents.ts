@@ -22,10 +22,21 @@ export type GamePhase
     | 'assassination'
     | 'game-over'
 
+/**
+ * Outcome reasons emitted by the backend's `game:ended` (see
+ * `backend/game/plugins/ResistanceCore.ts`). This file mirrors the backend
+ * event contract, so new reasons get added here alongside the events.
+ */
+export const GAME_OUTCOME_TYPES = [
+  { title: 'Mission Victory', value: 'mission-victory' },
+  { title: 'Nomination Limit', value: 'nomination-limit' },
+] as const
+
 export type ClientEventsBase = {
+  /** Host-only. All fields optional — only provided fields are applied. */
   'game:configure': {
-    modulesEnabled: string[]
-    optionalRoles: RoleName[]
+    modulesEnabled?: string[]
+    optionalRoles?: RoleName[]
   }
   'game:start': {
     leaderId: PlayerId
@@ -71,10 +82,25 @@ export type ServerEvents = {
     seatOrder: PlayerId[]
     hostId: PlayerId | null
   }
+  /** Broadcast whenever the host changes the game configuration. */
+  'game:configured': {
+    modulesEnabled: string[]
+    optionalRoles: RoleName[]
+  }
   'game:started': Record<string, never>
   'role:assigned': {
     role: RoleName
     knownRoles: Record<PlayerId, KnownRole> | undefined
+  }
+  /**
+   * Self-reported roles didn't form a legal composition; all roles were
+   * cleared and everyone must re-submit.
+   */
+  'role:reset': {
+    message: string
+  }
+  'mission:card-played': {
+    playerId: PlayerId
   }
   'nomination:started': {
     leaderId: PlayerId

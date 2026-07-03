@@ -6,6 +6,13 @@ import {
 } from "../../../../../game/metrics/indices.js";
 import { computeRoS_G, computeRoI_G } from "../../../../../game/metrics/perGameComplex.js";
 import { SPY_ROLES, type MetricsRow } from "../../../users/_userid/metrics/index.js";
+import { TtlCache } from "../../../../../utils/ttlCache.js";
+
+// A finished game's metrics are immutable (short of a catalog recompute),
+// and this endpoint re-derives O(players × history) indices per request.
+// 5 minutes of staleness only matters right after a recompute script run.
+// Exported so tests can clear it between cases.
+export const gameMetricsCache = new TtlCache<object | null>(5 * 60_000);
 
 type Get = {
     Params: { gameid: number };
@@ -184,11 +191,11 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
             ? { strategy: 'uniform' }
             : { strategy: 'expdecay', alpha };
 
+        const cacheKey = `${gameid}:${weighting.strategy}:${weighting.strategy === 'expdecay' ? weighting.alpha : ''}`;
+        const body = await gameMetricsCache.getOrCompute(cacheKey, async () => {
+
         const gameRows = await queryAll<GameRowResult>(GAME_ROW_SQL, [gameid]);
-        if (gameRows.length === 0) {
-            rep.code(404).send({ error: `No metrics found for game ${gameid}` });
-            return;
-        }
+        if (gameRows.length === 0) return null;
 
         // Game-level summary comes from any row (all share the join to `games`).
         const head = gameRows[0]!;
@@ -252,7 +259,7 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
             });
         }
 
-        rep.code(200).send({
+        return {
             gameid: Number(gameid),
             endTimestamp,
             outcome: {
@@ -279,7 +286,15 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
                     : { strategy: 'uniform' },
                 catalogVersion: head.catalog_version,
             },
+        };
+
         });
+
+        if (body === null) {
+            rep.code(404).send({ error: `No metrics found for game ${gameid}` });
+            return;
+        }
+        rep.code(200).send(body);
     } catch (error) {
         console.error(error);
         rep.code(500).send({ error: 'Something went wrong while computing game metrics.' });

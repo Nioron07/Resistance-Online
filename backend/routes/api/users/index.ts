@@ -14,8 +14,10 @@ type Get = {
          * the verbosity-0 shape sufficient for a search UI.
          */
         q?: string;
-        /** Result cap for the search path. Ignored when `q` is absent. */
+        /** Result cap for the search and all-users paths. */
         limit?: number;
+        /** Pagination offset for the all-users path. */
+        offset?: number;
     };
 };
 
@@ -61,7 +63,9 @@ export const GET: RouteHandler<Get> = async (req: FastifyRequest<Get>, rep: Fast
         // By this point, userids is guaranteed to be strictly number[]
         let users: QueryResultRow | null = null;
         if (userids.length === 0) {
-            users = await DAC.users.get(req.query.verbosity);
+            const limit = clampSearchLimit(req.query.limit);
+            const offset = Math.max(0, Math.floor(Number(req.query.offset)) || 0);
+            users = await DAC.users.get(req.query.verbosity, limit, offset);
 
         } else {
             users = await DAC.users.ids(userids as number[]).get(req.query.verbosity);
@@ -125,7 +129,13 @@ export const get_opts = {
                     minimum: 1,
                     maximum: 100,
                     default: 50,
-                    description: 'Max search results returned. Only honored when `q` is present.'
+                    description: 'Max results returned (search and all-users paths).'
+                },
+                offset: {
+                    type: 'integer',
+                    minimum: 0,
+                    default: 0,
+                    description: 'Pagination offset for the all-users path.'
                 }
             }
         }

@@ -42,7 +42,7 @@ export class TestGameRoom extends GameRoom {
     }
 
     removePlayer(username: string): boolean {
-        if (this.players.has(username)) {
+        if (!this.players.has(username)) {
             return false;
         }
 

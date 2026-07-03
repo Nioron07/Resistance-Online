@@ -79,6 +79,18 @@ class RoomManager {
     }
 
     /**
+     * Cancel a pending scheduled removal (e.g. a player reconnected to an
+     * abandoned room). No-op if nothing is scheduled.
+     */
+    cancelRemoval(code: number): void {
+        const timer = this.cleanupTimers.get(code);
+        if (timer) {
+            clearTimeout(timer);
+            this.cleanupTimers.delete(code);
+        }
+    }
+
+    /**
      * Schedule deletion of a room after the post-game grace window. Idempotent:
      * a second call with the same code is a no-op while the timer is pending.
      */

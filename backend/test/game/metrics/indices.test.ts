@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { computeIndices, weightedMean } from '../../../game/metrics/indices.js';
-import type { PointsRow } from '../../../game/metrics/indices.js';
+import { computeIndices, computeIndexHistory, weightedMean } from '../../../game/metrics/indices.js';
+import type { HistoryInputRow, PointsRow } from '../../../game/metrics/indices.js';
 
 describe('weightedMean', () => {
     it('returns null for an empty array', () => {
@@ -69,5 +69,46 @@ describe('computeIndices', () => {
         const old = computeIndices([r(0), r(0), r(10)], { strategy: 'expdecay', alpha: 0.5 });
         const recent = computeIndices([r(10), r(0), r(0)], { strategy: 'expdecay', alpha: 0.5 });
         expect(old.rIndex!).toBeGreaterThan(recent.rIndex!);
+    });
+});
+
+describe('computeIndexHistory', () => {
+    function h(side: 'resistance' | 'spy', points: number, gameid: number): HistoryInputRow {
+        return { side, points, gameid, endTimestamp: `2026-01-0${gameid}T00:00:00Z` };
+    }
+
+    it('returns [] for no games', () => {
+        expect(computeIndexHistory([], { strategy: 'uniform' })).toEqual([]);
+    });
+
+    it('each point matches computeIndices over the prefix (uniform)', () => {
+        const rows = [h('resistance', 10, 1), h('spy', 4, 2), h('resistance', -2, 3)];
+        const history = computeIndexHistory(rows, { strategy: 'uniform' });
+        for (const [i, point] of history.entries()) {
+            const prefix = computeIndices(rows.slice(0, i + 1), { strategy: 'uniform' });
+            expect(point.rIndex).toBe(prefix.rIndex);
+            expect(point.sIndex).toBe(prefix.sIndex);
+            expect(point.pIndex).toBe(prefix.pIndex);
+        }
+    });
+
+    it('each point matches computeIndices over the prefix (expdecay)', () => {
+        const rows = [h('resistance', 10, 1), h('resistance', 0, 2), h('spy', 6, 3), h('resistance', 4, 4)];
+        const w = { strategy: 'expdecay', alpha: 0.5 } as const;
+        const history = computeIndexHistory(rows, w);
+        for (const [i, point] of history.entries()) {
+            const prefix = computeIndices(rows.slice(0, i + 1), w);
+            expect(point.rIndex ?? Number.NaN).toBeCloseTo(prefix.rIndex ?? Number.NaN, 10);
+            expect(point.sIndex ?? null).toBe(prefix.sIndex === null ? null : point.sIndex);
+            if (prefix.sIndex !== null) expect(point.sIndex!).toBeCloseTo(prefix.sIndex, 10);
+            expect(point.pIndex!).toBeCloseTo(prefix.pIndex!, 10);
+        }
+    });
+
+    it('one-sided players fall back pIndex to the existing side', () => {
+        const history = computeIndexHistory([h('resistance', 8, 1)], { strategy: 'uniform' });
+        expect(history[0]!.rIndex).toBe(8);
+        expect(history[0]!.sIndex).toBeNull();
+        expect(history[0]!.pIndex).toBe(8);
     });
 });

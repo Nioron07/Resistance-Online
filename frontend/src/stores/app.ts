@@ -29,18 +29,32 @@ export const useAppStore = defineStore('app', () => {
   const loading = ref(false)
   const isAuthenticated = computed(() => user.value !== null)
 
-  async function fetchUser () {
+  // Dedupe: the router guard and several pages all call fetchUser() around
+  // the same time. The first call does the request; concurrent callers
+  // share its promise; later callers are a no-op until `force`.
+  let fetched = false
+  let inFlight: Promise<void> | null = null
+
+  function fetchUser (force = false): Promise<void> {
+    if (fetched && !force) return Promise.resolve()
+    if (inFlight) return inFlight
+
     loading.value = true
-    try {
-      const res = await fetch(`${API_BASE}/auth/me?verbosity=1`, {
-        credentials: 'include',
-      })
-      user.value = res.ok ? await res.json() : null
-    } catch {
-      user.value = null
-    } finally {
-      loading.value = false
-    }
+    inFlight = (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/auth/me?verbosity=1`, {
+          credentials: 'include',
+        })
+        user.value = res.ok ? await res.json() : null
+        fetched = true
+      } catch {
+        user.value = null
+      } finally {
+        loading.value = false
+        inFlight = null
+      }
+    })()
+    return inFlight
   }
 
   async function logout () {
@@ -79,7 +93,7 @@ export const useAppStore = defineStore('app', () => {
         return body.error ?? `HTTP ${res.status}`
       }
       // Refresh the local profile so isAuthenticated and username_set are current.
-      await fetchUser()
+      await fetchUser(true)
       return null
     } catch (error) {
       return (error as Error).message

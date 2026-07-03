@@ -15,10 +15,24 @@ export interface IndexTriple {
   pIndex: number | null
 }
 
+export interface IndexHistoryPoint {
+  gameid: number
+  endTimestamp: string
+  side: Side
+  /** Points earned in this game. */
+  points: number
+  /** Indices as of (and including) this game. */
+  rIndex: number | null
+  sIndex: number | null
+  pIndex: number | null
+}
+
 export interface UserIndex {
   rIndex: number | null
   sIndex: number | null
   pIndex: number | null
+  /** Per-game index trajectory, chronological (oldest first). */
+  history: IndexHistoryPoint[]
   details: {
     resistanceGames: number
     spyGames: number
@@ -144,6 +158,16 @@ export interface GameReplayRound {
   suspicions: Record<string, Record<string, number>> | null
 }
 
+export interface EvalPoint {
+  /** Aligns with GameReplayRound.roundId. */
+  roundId: number
+  /** Team points earned in this round alone. */
+  resistanceDelta: number
+  spyDelta: number
+  /** Cumulative resistance − spy points after this round. */
+  differential: number
+}
+
 export interface GameReplay {
   gameid: number
   startTimestamp: string | null
@@ -155,6 +179,8 @@ export interface GameReplay {
   }
   players: GameReplayPlayer[]
   rounds: GameReplayRound[]
+  /** Chess-style eval trajectory, one point per round (in round order). */
+  evalSeries: EvalPoint[]
 }
 
 interface FetchOptions {

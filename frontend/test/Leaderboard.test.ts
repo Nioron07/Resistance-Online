@@ -27,7 +27,7 @@ describe('Leaderboard page', () => {
     })
     const w = mount(Leaderboard)
     await flushPromises()
-    expect(api.fetchLeaderboard).toHaveBeenCalledWith('pIndex', 50)
+    expect(api.fetchLeaderboard).toHaveBeenCalledWith('pIndex', 50, undefined, expect.objectContaining({ signal: expect.anything() }))
     expect(w.text()).toContain('one')
     expect(w.text()).toContain('two')
     expect(w.text()).toContain('three')
@@ -49,7 +49,7 @@ describe('Leaderboard page', () => {
     await ptsTab.trigger('click')
     await flushPromises()
 
-    expect(api.fetchLeaderboard).toHaveBeenLastCalledWith('lifetimePoints', 50)
+    expect(api.fetchLeaderboard).toHaveBeenLastCalledWith('lifetimePoints', 50, undefined, expect.objectContaining({ signal: expect.anything() }))
     expect(w.text()).toContain('pts-leader')
     expect(w.text()).toContain('99')
   })

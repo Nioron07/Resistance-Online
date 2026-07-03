@@ -17,6 +17,14 @@ import { SPY_ROLES } from '../../routes/api/users/_userid/metrics/index.js';
  *    so we don't expose them per-game.
  *  - Both functions return null when the player isn't on the right side
  *    or never voted / was never targeted.
+ *  - These are the CANONICAL implementations: the lifetime endpoint
+ *    (/api/users/:userid/metrics) averages these per-game values, so any
+ *    formula change here propagates everywhere consistently.
+ *  - Whitepaper deviation (intentional): the whitepaper's RoS divides by
+ *    5·|V|, which can exceed [-1, 1] when several spies are suspected per
+ *    record. We divide by 5·spyCount·|V| so RoS is always bounded in
+ *    [-1, 1]. Empty slots (gamma = 0) are skipped and gamma is clamped to
+ *    {0..5} defensively (ingest also validates this).
  */
 
 export function computeRoS_G(userid: string, rows: MetricsRow[]): number | null {
@@ -30,7 +38,6 @@ export function computeRoS_G(userid: string, rows: MetricsRow[]): number | null 
 
     let sum = 0;
     let roundsWhereUserVoted = 0;
-    let anyVote = false;
 
     for (const row of rows) {
         const myVotes = row.suspicions?.[userid];
@@ -38,16 +45,18 @@ export function computeRoS_G(userid: string, rows: MetricsRow[]): number | null 
         roundsWhereUserVoted++;
         for (const [targetId, rawGamma] of Object.entries(myVotes)) {
             const gamma = clampGamma(rawGamma);
+            // gamma = 0 is a deliberately blank slot: per the whitepaper it
+            // still counts as a record, contributing 0 to the sum — so a
+            // submitted all-blank ballot scores 0, not null.
             if (gamma === 0) continue;
             const targetRole = players[targetId] ?? null;
             if (targetRole === null) continue;
             const c = SPY_ROLES.has(targetRole) ? 1 : -1;
             sum += c * gamma;
-            anyVote = true;
         }
     }
 
-    if (!anyVote || roundsWhereUserVoted === 0) return null;
+    if (roundsWhereUserVoted === 0) return null;
     return sum / (5 * spyCount * roundsWhereUserVoted);
 }
 

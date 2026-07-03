@@ -6,6 +6,12 @@ import {WebSocket} from "@fastify/websocket";
 import {ResistanceState} from "./ResistanceState.js";
 import {PlayerId} from "./types/GameTypes.js";
 import { DAC } from "../utils/db-queries/DataAccessClass.js";
+import { roomManager } from "../managers/RoomManager.js";
+
+// How long a mid-game room with zero connected sockets survives before it
+// is torn down. Long enough for everyone to ride out a shared network blip,
+// short enough that abandoned games don't leak forever.
+const ABANDONED_ROOM_GRACE_MS = 10 * 60 * 1000;
 
 export class ResistanceGameRoom extends GameRoom{
     maxSize: number = 10;
@@ -80,6 +86,9 @@ export class ResistanceGameRoom extends GameRoom{
      * @param ws The player WebSocket
      */
     addPlayer(playerId: PlayerId, ws: WebSocket): boolean {
+        // Any (re)connection revives an abandoned-room teardown.
+        roomManager.cancelRemoval(this.getJoinCode());
+
         if (this.reconnectTimers.has(playerId)) {
             const timer = this.reconnectTimers.get(playerId);
             if (timer) {
@@ -147,6 +156,14 @@ export class ResistanceGameRoom extends GameRoom{
         }
 
         this.bus.emit('player:disconnect', { playerId });
+
+        // Mid-game room with nobody connected: schedule teardown so
+        // abandoned games don't leak rooms/state forever. Cancelled if
+        // anyone reconnects (see addPlayer).
+        if (this.players.size === 0 && this.state.phase !== 'lobby') {
+            roomManager.scheduleRemoval(this.getJoinCode(), ABANDONED_ROOM_GRACE_MS);
+        }
+
         return true;
     }
 
@@ -195,12 +212,17 @@ export class ResistanceGameRoom extends GameRoom{
     }
 
     /**
-     * Broadcasts the full state per the visibility rules for each player
+     * Broadcasts the full state per the visibility rules for each player.
+     * Uses serializeForAll so the recipient-independent parts of the state
+     * are redacted once, not once per connected player.
      */
     broadcastState() {
+        const serialized = this.state.serializeForAll([...this.players.keys()]);
         for (const [playerId, ws] of this.players.entries()) {
+            const state = serialized.get(playerId);
+            if (state === undefined) continue;
             try {
-                ws.send(JSON.stringify({event: "state:update", data: {state: this.state.serializeFor(playerId)}}));
+                ws.send(JSON.stringify({event: "state:update", data: {state}}));
             } catch (err) {
                 console.warn(`[WS] state:update send failed for player ${playerId}`, err);
             }

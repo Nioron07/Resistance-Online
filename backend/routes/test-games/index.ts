@@ -51,6 +51,11 @@ const POST: RouteHandler<Post> = async (req: FastifyRequest<Post>, rep: FastifyR
 
 // ------------------- ------------------- Inject the Methods into the Route ------------------- ------------------- \\
 async function routes(fastify: FastifyInstance, _: object) {
+  // Test games are an unauthenticated dev/QA harness (free-text usernames,
+  // unbounded room creation) — never ship them enabled. Opt in with
+  // ENABLE_TEST_GAMES=true.
+  if (process.env.ENABLE_TEST_GAMES !== 'true') return;
+
   fastify.post('', {
         schema: {
             querystring: {

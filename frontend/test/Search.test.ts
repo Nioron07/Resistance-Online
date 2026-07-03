@@ -44,7 +44,7 @@ describe('Search page', () => {
     const input = wrapper.find('input[placeholder="Username"]')
     await input.setValue('nio')
     await flush()
-    expect(api.searchPlayers).toHaveBeenCalledWith('nio')
+    expect(api.searchPlayers).toHaveBeenCalledWith('nio', expect.objectContaining({ signal: expect.anything() }))
     expect(wrapper.text()).toContain('Nioron07')
   })
 

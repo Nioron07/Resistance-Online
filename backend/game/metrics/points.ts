@@ -53,6 +53,22 @@ export function computeGamePoints(userid: string, rows: MetricsRow[]): GamePoint
     return { side, points, breakdown, catalogVersion: CATALOG_VERSION };
 }
 
+/**
+ * Points one player earned in a single round (all per-round scorers, no
+ * end-of-game outcome bonus). This is the building block for the eval-bar
+ * time series: summing it over every round of a game plus the outcome
+ * bonus reproduces computeGamePoints exactly.
+ */
+export function scoreRowForPlayer(side: Side, userid: string, row: MetricsRow): number {
+    const breakdown: Record<string, number> = {};
+    scoreVoteAndOutcome(side, userid, row, breakdown);
+    scoreLeadership(side, userid, row, breakdown);
+    scoreTeamParticipation(side, userid, row, breakdown);
+    scoreActiveSuspicion(side, userid, row, breakdown);
+    scorePassiveSuspicion(side, userid, row, breakdown);
+    return sumBreakdown(breakdown);
+}
+
 // ---------------------------- voting + mission-outcome bonus ---------------------------- \\
 
 function scoreVoteAndOutcome(

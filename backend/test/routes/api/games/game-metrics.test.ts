@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import fastify, { type FastifyInstance } from 'fastify';
-import { GET, get_opts } from '../../../../routes/api/games/_gameid/metrics/index.js';
+import { GET, get_opts, gameMetricsCache } from '../../../../routes/api/games/_gameid/metrics/index.js';
 import * as db from '../../../../utils/db.js';
 
 vi.mock('../../../../utils/db.js', () => ({
@@ -62,6 +62,9 @@ describe('GET /api/games/:gameid/metrics', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
+        // Tests reuse gameids with different mocked DB payloads — a cached
+        // response from an earlier case would mask the new mock.
+        gameMetricsCache.clear();
     });
 
     it('404s when no metrics exist for the game', async () => {

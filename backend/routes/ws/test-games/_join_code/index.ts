@@ -95,6 +95,9 @@ const GET = async (socket: WebSocket, req: FastifyRequest<Post>) => {
 
 // ------------------- ------------------- Inject the Methods into the Route ------------------- ------------------- \\
 async function routes(fastify: FastifyInstance, _: object) {
+  // Gated with POST /test-games — see routes/test-games/index.ts.
+  if (process.env.ENABLE_TEST_GAMES !== 'true') return;
+
   fastify.get('', {
         websocket: true,
         schema: {

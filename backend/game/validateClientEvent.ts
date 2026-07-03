@@ -61,10 +61,12 @@ export function validateClientEvent(event: unknown, data: unknown): ValidationRe
 
     switch (event as keyof ClientEventsBase) {
         case 'game:configure': {
-            if (!Array.isArray(data.modulesEnabled) || !data.modulesEnabled.every(m => typeof m === 'string')) {
+            if (data.modulesEnabled !== undefined
+                && (!Array.isArray(data.modulesEnabled) || !data.modulesEnabled.every(m => typeof m === 'string'))) {
                 return fail('modulesEnabled must be string[]');
             }
-            if (!Array.isArray(data.optionalRoles) || !data.optionalRoles.every(r => typeof r === 'string' && ALL_ROLES.has(r as RoleName))) {
+            if (data.optionalRoles !== undefined
+                && (!Array.isArray(data.optionalRoles) || !data.optionalRoles.every(r => typeof r === 'string' && ALL_ROLES.has(r as RoleName)))) {
                 return fail('optionalRoles must be RoleName[]');
             }
             return ok;
@@ -101,6 +103,10 @@ export function validateClientEvent(event: unknown, data: unknown): ValidationRe
             for (const [k, v] of Object.entries(data.sus)) {
                 if (!Number.isInteger(Number(k))) return fail('sus keys must be integer playerIds');
                 if (typeof v !== 'number' || !Number.isFinite(v)) return fail('sus values must be finite numbers');
+                // Confidence is defined on {0..5} (0 = slot left empty).
+                // Reject anything outside that so stored suspicions can't
+                // skew RoS/RoI metrics.
+                if (!Number.isInteger(v) || v < 0 || v > 5) return fail('sus values must be integers in 0..5');
             }
             return ok;
         }

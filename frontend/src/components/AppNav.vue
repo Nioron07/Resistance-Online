@@ -59,10 +59,7 @@
         <v-list-item
           prepend-icon="mdi-logout"
           title="Logout"
-          @click="
-            appStore.logout();
-            router.push('/Login/Login');
-          "
+          @click="logout"
         />
       </template>
 
@@ -133,7 +130,7 @@
           <v-list-item
             prepend-icon="mdi-logout"
             title="Logout"
-            @click="appStore.logout()"
+            @click="logout"
           />
         </template>
 
@@ -171,6 +168,12 @@
   const userIdLabel = computed(() =>
     appStore.user?.id ? `#${appStore.user.id}` : '',
   )
+
+  /** Await the logout so the session cookie is cleared before the guard re-runs. */
+  async function logout () {
+    await appStore.logout()
+    router.push('/Login/Login')
+  }
 
   const pageTitle = computed(() => {
     const p = route.path
