@@ -15,7 +15,13 @@ const dbConfig = {
   // Connection pool settings
   max: parseInt(process.env.DB_POOL_MAX || '10', 10),
   idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10),
-  connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '2000', 10),
+  // Cloud SQL connections (esp. cold) can take several seconds to establish.
+  // A 2s cap made burst requests fail with "timeout exceeded when trying to
+  // connect" instead of queuing briefly; 10s lets them wait it out.
+  connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '10000', 10),
+  // Keep pooled sockets warm so we're not repeatedly paying Cloud SQL's
+  // connection-setup latency under bursty traffic.
+  keepAlive: true,
 }
 
 // Create a connection pool

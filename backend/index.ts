@@ -96,6 +96,13 @@ await server.register(session, {
     maxAge: 86400000,
   },
   saveUninitialized: false,
+  // Don't re-save an unchanged session on every request. Without this the
+  // store writes to Postgres on EVERY request (to slide the cookie expiry),
+  // which — on a slow Cloud SQL instance — drains the connection pool and
+  // makes the save in the onSend hook fire late, colliding with the
+  // already-sent response. With rolling off, writes happen only on login
+  // (session created/modified) and logout (destroy).
+  rolling: false,
 });
 
 // Initialize the passport onto fastify and then allow it to be saved to the session
@@ -127,6 +134,19 @@ if (existsSync(publicDir)) {
     rep.code(404).send({ error: 'Not Found' })
   })
 }
+
+// ------------------- ------------------- Crash Guards ------------------- ------------------- \\
+// A single request-scoped error must never take down the whole instance —
+// doing so drops every live WebSocket game on it. In particular, a late
+// session-store callback can surface as an uncaught ERR_HTTP_HEADERS_SENT
+// from deep inside fastify's onSend path, which we can't try/catch locally.
+// Log and keep serving instead of letting the process die.
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException] keeping process alive:', err)
+})
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection] keeping process alive:', reason)
+})
 
 // ------------------- ------------------- Server Setup ------------------- ------------------- \\
 const port = parseInt(process.env.PORT || '8080')
