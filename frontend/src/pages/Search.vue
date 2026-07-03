@@ -291,7 +291,8 @@
     { key: 'outcome', label: 'OUTCOME', align: 'left' as const, width: '160px' },
     { key: 'players', label: 'P', align: 'right' as const, width: '50px' },
     { key: 'missions', label: 'MISSIONS', align: 'left' as const },
-    { key: 'replay', label: '', align: 'right' as const, width: '40px', stackedHide: true },
+    // Keep the replay action visible in the stacked mobile view.
+    { key: 'replay', label: 'REPLAY', align: 'right' as const, width: '40px', stackedHide: false },
   ]
 
   // ----- Debounce helper -----
@@ -546,7 +547,8 @@
   background: transparent;
   border: 1px solid rgb(var(--v-theme-border));
   border-radius: 999px;
-  padding: 4px 12px;
+  /* Tall enough to tap — the old 4px padding made ~24px pills. */
+  padding: 9px 14px;
   font-size: 0.7rem;
   letter-spacing: 0.08em;
   color: rgb(var(--v-theme-on-surface-muted));

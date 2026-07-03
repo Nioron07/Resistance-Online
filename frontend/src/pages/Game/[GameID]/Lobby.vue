@@ -25,14 +25,51 @@
         <p class="r-phase-sub mt-2">
           {{
             game.isHost
-              ? "You are the host. Drag a player onto another to swap their seats."
+              ? (smAndDown ? "You are the host. Use the arrows to reorder seats." : "You are the host. Drag a player onto another to swap their seats.")
               : "Waiting for the host to start…"
           }}
         </p>
       </header>
 
-      <!-- Circle of players -->
-      <div ref="circleEl" class="r-circle">
+      <!-- Mobile: a simple seat list. The circle is unreadable on a phone
+           and HTML5 drag-and-drop doesn't exist on touch — hosts reorder
+           with up/down buttons instead. -->
+      <div v-if="smAndDown" class="r-seat-list">
+        <div
+          v-for="(id, index) in game.playerIds"
+          :key="id"
+          class="r-seat-row"
+          :class="{ 'r-seat-row-leader': index === 0 }"
+        >
+          <span class="r-seat-badge r-seat-badge-list tabular-nums" :class="{ 'r-seat-leader': index === 0 }">
+            {{ index === 0 ? '★' : index + 1 }}
+          </span>
+
+          <span class="r-seat-name">{{ game.playerProfiles[id]?.username ?? `Player ${id}` }}</span>
+
+          <span v-if="game.isHost" class="r-seat-actions">
+            <v-btn
+              density="comfortable"
+              :disabled="index === 0"
+              icon="mdi-chevron-up"
+              size="small"
+              variant="text"
+              @click="moveSeat(index, -1)"
+            />
+            <v-btn
+              density="comfortable"
+              :disabled="index === game.playerIds.length - 1"
+              icon="mdi-chevron-down"
+              size="small"
+              variant="text"
+              @click="moveSeat(index, 1)"
+            />
+          </span>
+        </div>
+      </div>
+
+      <!-- Desktop: circle of players -->
+      <div v-else ref="circleEl" class="r-circle">
         <div class="r-circle-center">
           <v-icon class="r-rotate-icon" icon="mdi-rotate-right" size="large" />
           <div class="r-rotate-label">LEADER PASSES<br>CLOCKWISE</div>
@@ -46,6 +83,7 @@
             'r-circle-slot-host': game.isHost,
             'r-circle-slot-dragging': draggingId === id,
             'r-circle-slot-drop-hover': dragHoverId === id && draggingId !== null && draggingId !== id,
+            'r-circle-slot-crowded': game.playerIds.length >= 8,
           }"
           :draggable="game.isHost"
           :style="slotStyle(index, game.playerIds.length)"
@@ -95,11 +133,13 @@
 <script setup lang="ts">
   import { onUnmounted, ref } from 'vue'
   import { useRoute } from 'vue-router'
+  import { useDisplay } from 'vuetify'
   import PlayerCard from '@/components/PlayerCard.vue'
   import { useGameStore } from '@/stores/game'
 
   const route = useRoute()
   const game = useGameStore()
+  const { smAndDown } = useDisplay()
   const copied = ref(false)
 
   /** Drag-and-drop swap state. */
@@ -122,6 +162,15 @@
       top: `${y}%`,
       transform: 'translate(-50%, -50%)',
     }
+  }
+
+  /** Mobile reorder: move the seat at `index` up (-1) or down (+1). */
+  function moveSeat (index: number, dir: -1 | 1) {
+    const target = index + dir
+    if (target < 0 || target >= game.playerIds.length) return
+    const order = [...game.playerIds]
+    ;[order[index], order[target]] = [order[target]!, order[index]!]
+    game.reorderSeats(order)
   }
 
   /** Swap two players in the seat order and broadcast the new order. */
@@ -294,6 +343,11 @@
   user-select: none;
   transition: transform 200ms ease-out, filter 200ms ease-out;
 }
+/* 8-10 players: 36-45° of arc per seat isn't enough for full-size cards —
+   shrink the slots so neighbors stop overlapping at the circle's poles. */
+.r-circle-slot-crowded {
+  width: clamp(64px, 16%, 100px);
+}
 .r-circle-slot-host { cursor: grab; }
 .r-circle-slot-host:active { cursor: grabbing; }
 .r-circle-slot-dragging {
@@ -324,6 +378,42 @@
   color: var(--r-resistance);
 }
 
+/* ---------------- Mobile seat list ---------------- */
+.r-seat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px auto;
+  max-width: 480px;
+}
+.r-seat-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid rgb(var(--v-theme-border));
+  border-radius: 8px;
+  background-color: rgba(10, 14, 20, 0.5);
+}
+.r-seat-row-leader { border-color: rgba(59, 130, 246, 0.55); }
+.r-seat-badge-list {
+  position: static;
+  flex: 0 0 auto;
+}
+.r-seat-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+.r-seat-actions {
+  display: inline-flex;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
 .r-start-btn {
   font-weight: 500;
   letter-spacing: 0.12em;
@@ -346,7 +436,7 @@
 .fade-leave-to { opacity: 0; }
 
 /* ---------------- Mobile breakpoint ---------------- */
-@media (max-width: 540px) {
+@media (max-width: 600px) {
   .r-circle {
     max-width: 360px;
   }

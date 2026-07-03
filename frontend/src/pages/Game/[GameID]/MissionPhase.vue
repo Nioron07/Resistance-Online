@@ -143,7 +143,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
-@media (max-width: 540px) { .r-mission-grid { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .r-mission-grid { grid-template-columns: 1fr; } }
 .r-mission-btn {
   width: 100%;
   height: clamp(140px, 32vw, 220px);

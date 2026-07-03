@@ -179,8 +179,11 @@
             confidence γ (1 = mild, 5 = certain).
           </p>
 
-          <table class="r-suspicion-grid tabular-nums">
-            <thead>
+          <!-- Scrolls horizontally inside the card — an 8-10 player grid is
+               wider than a phone viewport. -->
+          <div class="r-suspicion-scroll">
+            <table class="r-suspicion-grid tabular-nums">
+              <thead>
               <tr>
                 <th />
 
@@ -203,8 +206,9 @@
                   {{ suspicionCellText(currentStep.round.suspicions, voterid, t.userid) }}
                 </td>
               </tr>
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- OUTCOME -->
@@ -526,8 +530,26 @@
     }
   }
 
+  // --- Touch nav: horizontal swipe = prev/next (keyboard equivalent) ---
+  let touchStartX = 0
+  let touchStartY = 0
+  function onTouchStart (e: TouchEvent) {
+    touchStartX = e.changedTouches[0]?.clientX ?? 0
+    touchStartY = e.changedTouches[0]?.clientY ?? 0
+  }
+  function onTouchEnd (e: TouchEvent) {
+    const dx = (e.changedTouches[0]?.clientX ?? 0) - touchStartX
+    const dy = (e.changedTouches[0]?.clientY ?? 0) - touchStartY
+    // Deliberate horizontal swipe only — ignore taps and vertical scrolls.
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+    if (dx < 0) next()
+    else prev()
+  }
+
   onMounted(async () => {
     window.addEventListener('keydown', onKeydown)
+    window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchend', onTouchEnd, { passive: true })
     if (!gameid.value) {
       error.value = 'No game id'
       loading.value = false
@@ -568,6 +590,8 @@
 
   onUnmounted(() => {
     window.removeEventListener('keydown', onKeydown)
+    window.removeEventListener('touchstart', onTouchStart)
+    window.removeEventListener('touchend', onTouchEnd)
   })
 </script>
 
@@ -633,6 +657,11 @@
   cursor: pointer;
   transition: all 200ms ease-out;
 }
+/* Phones: 14px ticks are un-tappable — grow them toward the 40px touch
+   minimum. The strip already scrolls horizontally so width is safe. */
+@media (max-width: 600px) {
+  .r-tick { width: 24px; height: 24px; }
+}
 .r-tick:hover         { transform: translateY(-1px); }
 .r-tick-future        { opacity: 0.55; }
 .r-tick-past          { background-color: rgb(var(--v-theme-surface-elevated)); }
@@ -656,6 +685,9 @@
   border-radius: 12px;
   padding: 20px;
   min-height: 280px;
+}
+@media (max-width: 600px) {
+  .r-step-card { padding: 14px; min-height: 200px; }
 }
 .r-step-header { margin-bottom: 16px; }
 .r-step-eyebrow {
@@ -735,7 +767,7 @@
 
 .r-ballot-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 8px;
 }
 .r-ballot {
@@ -760,7 +792,7 @@
 .r-mission { display: flex; flex-direction: column; gap: 16px; }
 .r-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
   gap: 8px;
 }
 .r-card-cell {
@@ -784,6 +816,11 @@
 /* Suspicion grid */
 .r-suspicion { display: flex; flex-direction: column; gap: 8px; }
 .r-suspicion-hint { font-size: 0.75rem; }
+.r-suspicion-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .r-suspicion-grid {
   border-collapse: collapse;
   font-size: 0.75rem;

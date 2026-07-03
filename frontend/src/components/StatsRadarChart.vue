@@ -1,10 +1,14 @@
 <template>
-  <VueApexCharts height="300" :options="chartOptions" :series="series" type="radar" />
+  <VueApexCharts :height="chartHeight" :options="chartOptions" :series="series" type="radar" />
 </template>
 
 <script setup lang="ts">
   import { computed } from 'vue'
+  import { useDisplay } from 'vuetify'
   import VueApexCharts from 'vue3-apexcharts'
+
+  const { smAndDown } = useDisplay()
+  const chartHeight = computed(() => (smAndDown.value ? 220 : 300))
 
   const props = defineProps<{
     stats?: {

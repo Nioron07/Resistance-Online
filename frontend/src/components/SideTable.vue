@@ -137,10 +137,20 @@
 </script>
 
 <style scoped>
-.side-table-wrapper { width: 100%; }
+/*
+ * The table variant can exceed its container when many fixed-width columns
+ * are declared (EndState has 9-10). Scroll inside the wrapper instead of
+ * blowing out the page — this also makes the sticky header actually stick.
+ */
+.side-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 
 .side-table {
   width: 100%;
+  min-width: max-content;
   border-collapse: collapse;
   font-size: 0.875rem;
 }

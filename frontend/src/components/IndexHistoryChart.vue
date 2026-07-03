@@ -1,11 +1,15 @@
 <template>
-  <VueApexCharts height="280" :options="chartOptions" :series="series" type="line" />
+  <VueApexCharts :height="chartHeight" :options="chartOptions" :series="series" type="line" />
 </template>
 
 <script setup lang="ts">
   import type { IndexHistoryPoint } from '@/services/api'
   import { computed } from 'vue'
+  import { useDisplay } from 'vuetify'
   import VueApexCharts from 'vue3-apexcharts'
+
+  const { smAndDown } = useDisplay()
+  const chartHeight = computed(() => (smAndDown.value ? 200 : 280))
 
   const props = defineProps<{
     history: IndexHistoryPoint[]

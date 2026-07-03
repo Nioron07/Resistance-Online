@@ -1,10 +1,10 @@
 <template>
-  <div class="d-flex align-center">
+  <div class="r-player-row d-flex align-center">
     <img v-if="avatar" alt="" class="r-player-avatar" :src="avatar">
     <div v-else class="r-player-avatar r-player-avatar-fallback">{{ initials }}</div>
 
     <div class="r-player-stack">
-      <span class="r-player-name">{{ username }}</span>
+      <span class="r-player-name" :title="username">{{ username }}</span>
       <span class="r-player-role text-medium-emphasis">{{ roleDisplay }}</span>
     </div>
   </div>
@@ -37,7 +37,17 @@
   font-size: 0.65rem;
   color: rgb(var(--v-theme-on-surface-muted));
 }
-.r-player-stack { display: flex; flex-direction: column; }
-.r-player-name  { font-size: 0.875rem; }
+/* min-width:0 lets the stack shrink inside flex/grid cells so long
+   usernames ellipsize instead of overflowing ballot/mission/table cells —
+   this component is the app's most reused overflow vector. */
+.r-player-row   { min-width: 0; }
+.r-player-stack { display: flex; flex-direction: column; min-width: 0; }
+.r-player-name  {
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .r-player-role  { font-size: 0.65rem; letter-spacing: 0.08em; }
+.r-player-avatar { flex: 0 0 auto; }
 </style>

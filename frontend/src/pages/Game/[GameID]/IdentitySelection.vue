@@ -147,7 +147,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
-@media (max-width: 540px) { .r-identity-grid { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .r-identity-grid { grid-template-columns: 1fr; } }
 .r-identity-btn {
   width: 100%;
   height: clamp(140px, 32vw, 220px);

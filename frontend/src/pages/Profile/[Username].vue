@@ -220,7 +220,9 @@
     { key: 'points', label: 'POINTS', align: 'right' as const, width: '90px' },
     { key: 'won', label: 'RESULT', align: 'left' as const, width: '90px' },
     { key: 'missions', label: 'MISSIONS', align: 'left' as const },
-    { key: 'replay', label: '', align: 'right' as const, width: '40px', stackedHide: true },
+    // Keep the replay action in the stacked mobile view — hiding it left
+    // phones with no way to reach a game's replay from the log.
+    { key: 'replay', label: 'REPLAY', align: 'right' as const, width: '40px', stackedHide: false },
   ]
 
   const hasMore = computed(() => {
@@ -319,10 +321,11 @@
 .r-profile { padding-top: 24px; padding-bottom: 48px; }
 .r-profile-header { margin-bottom: 24px; }
 .r-profile-name {
-  font-size: 1.75rem;
+  font-size: clamp(1.2rem, 5vw, 1.75rem);
   font-weight: 300;
   letter-spacing: 0.04em;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 .r-profile-meta {
   margin: 0;
@@ -338,7 +341,7 @@
   margin-bottom: 24px;
 }
 @media (max-width: 960px) { .r-grid-headline { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 480px) { .r-grid-headline { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .r-grid-headline { grid-template-columns: 1fr; } }
 
 .r-index-history { margin-bottom: 24px; }
 .r-history-card {
@@ -370,7 +373,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
-@media (max-width: 480px) { .r-split-grid { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .r-split-grid { grid-template-columns: 1fr; } }
 
 .r-game-log-header {
   display: flex;

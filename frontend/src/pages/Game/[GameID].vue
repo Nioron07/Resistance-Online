@@ -139,6 +139,11 @@
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
+  /* Absolutely centered = removed from flow; never let it paint over the
+     bar's prepend/append content on narrow screens. */
+  max-width: 60vw;
+  overflow: hidden;
+  pointer-events: none;
 }
 .r-phase {
   font-size: 0.75rem;
@@ -173,7 +178,11 @@
 
 .r-game-stage {
   position: relative;
+  /* The v-app-bar above is default density = 64px. dvh (with a vh fallback
+     for old browsers) tracks the real mobile viewport as the URL bar
+     collapses — plain 100vh clips the bottom of the page on phones. */
   height: calc(100vh - 64px);
+  height: calc(100dvh - 64px);
 }
 .r-game-bg {
   position: absolute;

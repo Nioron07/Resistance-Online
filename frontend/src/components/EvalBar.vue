@@ -62,6 +62,11 @@
 }
 .r-eval-label-resistance { color: var(--r-resistance); }
 .r-eval-label-spy        { color: var(--r-spy); }
+/* Tiny screens: the two labels eat half the width — the blue/red fill
+   already communicates the sides, so give the track the room instead. */
+@media (max-width: 420px) {
+  .r-eval-label { display: none; }
+}
 
 .r-eval-track {
   position: relative;

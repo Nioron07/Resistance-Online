@@ -89,7 +89,7 @@
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
 }
-@media (max-width: 720px) {
+@media (max-width: 600px) {
   .r-team-grid {
     grid-template-columns: 1fr;
   }

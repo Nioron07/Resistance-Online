@@ -185,7 +185,8 @@
       </article>
     </section>
 
-    <!-- Footer actions -->
+    <!-- Footer actions. Spacing comes from the flex gap alone — per-button
+         margins double up when the row wraps on small screens. -->
     <footer v-if="!loading" class="r-end-footer">
       <v-btn color="primary" size="large" variant="flat" @click="router.push('/')">
         RETURN HOME
@@ -193,7 +194,6 @@
 
       <v-btn
         v-if="myProfileHref"
-        class="ml-2"
         prepend-icon="mdi-account"
         size="large"
         variant="tonal"
@@ -203,7 +203,6 @@
       </v-btn>
 
       <v-btn
-        class="ml-2"
         prepend-icon="mdi-play-circle"
         size="large"
         variant="tonal"
@@ -212,11 +211,11 @@
         REPLAY GAME
       </v-btn>
 
-      <v-btn class="ml-2" variant="text" @click="copyShareLink">
+      <v-btn variant="text" @click="copyShareLink">
         COPY SHARE LINK
       </v-btn>
 
-      <span v-if="copied" class="ml-2 text-medium-emphasis">copied</span>
+      <span v-if="copied" class="text-medium-emphasis">copied</span>
       <span v-if="data" class="r-catalog-badge">CATALOG v{{ data.details.catalogVersion }}</span>
     </footer>
 
@@ -227,7 +226,6 @@
 <script setup lang="ts">
   import { computed, onMounted, ref } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
-  import { useDisplay } from 'vuetify'
   import BreakdownPanel from '@/components/BreakdownPanel.vue'
   import GameOutcomeChip from '@/components/GameOutcomeChip.vue'
   import IndexBadge from '@/components/IndexBadge.vue'
@@ -240,7 +238,6 @@
 
   const route = useRoute()
   const router = useRouter()
-  const { smAndDown } = useDisplay()
   const appStore = useAppStore()
   const gameStore = useGameStore()
 
@@ -310,7 +307,9 @@
     }
     base.push(
       { key: 'complex', label: side === 'resistance' ? 'RoS' : 'RoI', align: 'right' as const, width: '70px', stackedHide: false },
-      { key: 'breakdown', label: '', align: 'right' as const, width: '40px', stackedHide: true },
+      // Action column must stay visible in the stacked mobile view —
+      // hiding it made point breakdowns unreachable on phones.
+      { key: 'breakdown', label: 'BREAKDOWN', align: 'right' as const, width: '40px', stackedHide: false },
     )
     return base
   }
@@ -349,13 +348,6 @@
       error.value = (error_ as Error).message
     }
   }
-
-  /**
-   * Suppress unused-variable warning — useDisplay() is destructured for
-   * its side effect of registering breakpoint reactivity, in case we
-   * re-enable a mobile-tab variant later. Keep the import live.
-   */
-  void smAndDown
 
   onMounted(async () => {
     if (!gameid.value) {
@@ -476,6 +468,11 @@
   border: 1px solid rgb(var(--v-theme-border));
   padding: 2px 8px;
   border-radius: 4px;
+}
+@media (max-width: 600px) {
+  /* When the footer wraps, auto-margin makes the badge jump around —
+     let it flow with the rest instead. */
+  .r-catalog-badge { margin-left: 0; }
 }
 
 .r-error { margin-top: 16px; text-align: center; color: var(--r-spy); font-size: 0.875rem; }

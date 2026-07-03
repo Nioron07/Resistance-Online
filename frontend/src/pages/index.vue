@@ -145,7 +145,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
-@media (max-width: 720px) {
+@media (max-width: 600px) {
   .r-grid { grid-template-columns: 1fr; }
 }
 .r-action-card {

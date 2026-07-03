@@ -167,7 +167,8 @@
   flex: 1;
   background: transparent;
   border: 0;
-  padding: 8px 12px;
+  /* ≥40px tall — comfortable touch target. */
+  padding: 11px 12px;
   font-family: var(--r-mono);
   font-size: 0.8rem;
   letter-spacing: 0.08em;
@@ -176,6 +177,10 @@
   border-radius: 6px;
   transition: all 200ms ease-out;
   min-width: 120px;
+}
+@media (max-width: 600px) {
+  /* Two clean 2×2 rows instead of an awkward 3+1 wrap. */
+  .r-tab { min-width: 40%; }
 }
 .r-tab:hover  { color: rgb(var(--v-theme-on-surface)); }
 .r-tab-active {
