@@ -99,17 +99,10 @@ interface ComplexMetrics {
     };
     general: {
         /**
-         * Lifetime Leader Approval: fraction of this player's led
-         * nominations that the table approved. Both sides.
-         * null when the player has never led a nomination.
-         */
-        LeaderApproval_L: number | null;
-
-        /**
          * Lifetime Trust: fraction of other resistance players' suspicion
-         * records that OMITTED this player (or left their slot at γ=0).
-         * Both sides — a spy's Trust is closely related to RoI, a
-         * resistance player's Trust shows how much the table believes them.
+         * records that OMITTED this player (or left their slot at γ=0),
+         * across every game regardless of role. High = the table tends to
+         * believe you; low = you draw suspicion.
          * null when nobody has ever submitted a suspicion record around them.
          */
         Trust_L: number | null;
@@ -175,9 +168,6 @@ export function computeMetrics(
 
     let RoIF_missions = 0;
     let RoIF_proposals = 0;
-
-    let led = 0;
-    let ledApproved = 0;
 
     let trustRecords = 0;
     let trustOmitted = 0;
@@ -267,29 +257,24 @@ export function computeMetrics(
             }
         }
 
-        // Leader approval (both sides), Trust (both sides), and Vote
-        // Accuracy (resistance only).
+        // Trust (both sides): every suspicion record submitted by ANOTHER
+        // resistance player either omitted this player (trust) or marked them.
         for (const row of gameRounds) {
-            if (String(row.leader_userid) === userid) {
-                led++;
-                if (row.vote_status === true) ledApproved++;
+            if (!row.suspicions) continue;
+            for (const [voterId, votes] of Object.entries(row.suspicions)) {
+                if (voterId === userid) continue;
+                const voterRole = players[voterId] ?? null;
+                if (voterRole === null || SPY_ROLES.has(voterRole)) continue; // resistance voters only
+                trustRecords++;
+                const gamma = Number(votes[userid] ?? 0);
+                if (!Number.isFinite(gamma) || gamma <= 0) trustOmitted++;
             }
+        }
 
-            // Trust: every suspicion record submitted by ANOTHER resistance
-            // player either omitted this player (trust) or marked them.
-            if (row.suspicions) {
-                for (const [voterId, votes] of Object.entries(row.suspicions)) {
-                    if (voterId === userid) continue;
-                    const voterRole = players[voterId] ?? null;
-                    if (voterRole === null || SPY_ROLES.has(voterRole)) continue;
-                    trustRecords++;
-                    const gamma = Number(votes[userid] ?? 0);
-                    if (!Number.isFinite(gamma) || gamma <= 0) trustOmitted++;
-                }
-            }
-
-            // Vote accuracy: correct = approve clean OR reject dirty.
-            if (!userIsSpy && row.vote_poll && Object.prototype.hasOwnProperty.call(row.vote_poll, userid)) {
+        // Vote Accuracy (resistance only): correct = approve clean OR reject dirty.
+        if (!userIsSpy) {
+            for (const row of gameRounds) {
+                if (!row.vote_poll || !Object.prototype.hasOwnProperty.call(row.vote_poll, userid)) continue;
                 const vote = row.vote_poll[userid];
                 const dirty = (row.count_spies_nominated ?? 0) > 0;
                 if (vote === true || vote === false) {
@@ -322,7 +307,6 @@ export function computeMetrics(
             total: lifetimePoints.resistance + lifetimePoints.spy,
         },
         general: {
-            LeaderApproval_L: led > 0 ? ledApproved / led : null,
             Trust_L: trustRecords > 0 ? trustOmitted / trustRecords : null,
         },
         resistance: {
@@ -415,8 +399,7 @@ export const get_opts = {
                     general: {
                         type: 'object',
                         properties: {
-                            LeaderApproval_L: {type: ['number', 'null'], description: 'Fraction of led nominations that were approved. null if never led'},
-                            Trust_L:          {type: ['number', 'null'], description: "Fraction of others' suspicion records that omitted this player. null if no records exist"},
+                            Trust_L: {type: ['number', 'null'], description: "Fraction of others' suspicion records that omitted this player. null if no records exist"},
                         }
                     },
                     resistance: {

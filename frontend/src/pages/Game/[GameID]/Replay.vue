@@ -740,25 +740,38 @@
 
 /* Vote */
 .r-vote { display: flex; flex-direction: column; gap: 16px; }
-.r-vote-result-row {
+/* Result bar — shared by the vote and mission steps. A padded, bordered
+   strip that spans the card, with the ✓/✗ tally pushed to the right. */
+.r-vote-result-row,
+.r-mission-result-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   flex-wrap: wrap;
+  width: 100%;
+  padding: 12px 16px;
+  background-color: rgb(var(--v-theme-surface-elevated));
+  border: 1px solid rgb(var(--v-theme-border));
+  border-radius: 8px;
 }
 .r-vote-result-label,
 .r-mission-result-label {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   letter-spacing: 0.12em;
   color: rgb(var(--v-theme-on-surface-muted));
 }
 .r-vote-result-chip,
 .r-mission-result-chip {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   letter-spacing: 0.08em;
-  padding: 4px 10px;
+  padding: 6px 14px;
   border: 1px solid rgb(var(--v-theme-border));
   border-radius: 4px;
+}
+.r-vote-result-counts,
+.r-mission-result-counts {
+  margin-left: auto;
+  font-size: 0.85rem;
 }
 .r-vote-chip-yes,
 .r-mission-chip-success { color: var(--r-resistance); border-color: rgba(59, 130, 246, 0.55); }
@@ -822,19 +835,29 @@
   -webkit-overflow-scrolling: touch;
 }
 .r-suspicion-grid {
+  /* Fill the card on desktop so the cells spread out; the scroll wrapper
+     still handles overflow when the grid is wider than the viewport. */
+  width: 100%;
   border-collapse: collapse;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 .r-suspicion-grid th, .r-suspicion-grid td {
-  padding: 4px 6px;
+  padding: 8px 10px;
   border: 1px solid rgb(var(--v-theme-border));
   text-align: center;
-  min-width: 36px;
+  min-width: 48px;
+}
+.r-suspicion-grid thead th {
+  background-color: rgb(var(--v-theme-surface-elevated));
+  font-weight: 500;
+  color: rgb(var(--v-theme-on-surface-muted));
 }
 .r-sus-row-label {
   text-align: left;
   letter-spacing: 0.04em;
   white-space: nowrap;
+  background-color: rgb(var(--v-theme-surface-elevated));
+  font-weight: 500;
 }
 .r-sus-cell-resistance { background-color: rgba(59, 130, 246, 0.16); }
 .r-sus-cell-spy        { background-color: rgba(239,  68,  68, 0.16); }

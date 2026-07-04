@@ -52,9 +52,7 @@ export interface UserMetrics {
   }
   lifetimePoints: { resistance: number, spy: number, total: number }
   general: {
-    /** Fraction of led nominations the table approved. */
-    LeaderApproval_L: number | null
-    /** Fraction of others' suspicion records that omitted this player. */
+    /** Fraction of others' suspicion records that omitted this player (both roles). */
     Trust_L: number | null
   }
   resistance: {

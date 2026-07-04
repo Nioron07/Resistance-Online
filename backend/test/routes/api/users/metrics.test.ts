@@ -555,17 +555,7 @@ describe('Metrics', () => {
     });
 });
 
-describe('General metrics — LeaderApproval_L / Trust_L / VoteAcc_L', () => {
-    it('LeaderApproval_L = approved led rounds / led rounds', () => {
-        const rounds = [
-            makeRound({ game_id: 1, round_index_in_game: 0, players: PLAYERS_5, leader_userid: '1', vote_status: true }),
-            makeRound({ game_id: 1, round_index_in_game: 1, players: PLAYERS_5, leader_userid: '1', vote_status: false }),
-            makeRound({ game_id: 1, round_index_in_game: 2, players: PLAYERS_5, leader_userid: '2', vote_status: true }),
-        ];
-        expect(computeMetrics('1', rounds).general.LeaderApproval_L).toBeCloseTo(0.5);
-        expect(computeMetrics('3', rounds).general.LeaderApproval_L).toBeNull();
-    });
-
+describe('Trust_L - Lifetime Trust', () => {
     it('Trust_L = fraction of other resistance records omitting the player (spy records ignored)', () => {
         const rounds = [
             makeRound({
@@ -590,6 +580,15 @@ describe('General metrics — LeaderApproval_L / Trust_L / VoteAcc_L', () => {
         expect(computeMetrics('1', rounds).general.Trust_L).toBeCloseTo(1);
     });
 
+    it('null when no suspicion records exist around the player', () => {
+        const rounds = [
+            makeRound({ game_id: 1, round_index_in_game: 0, players: PLAYERS_5 }),
+        ];
+        expect(computeMetrics('1', rounds).general.Trust_L).toBeNull();
+    });
+});
+
+describe('VoteAcc_L - Lifetime Vote Accuracy', () => {
     it('VoteAcc_L counts approve-clean and reject-dirty as correct (resistance only)', () => {
         const rounds = [
             makeRound({ game_id: 1, round_index_in_game: 0, players: PLAYERS_5, count_spies_nominated: 0, vote_poll: { '1': true,  '4': true } }),   // correct

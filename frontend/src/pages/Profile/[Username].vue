@@ -64,6 +64,14 @@
           side="neutral"
           :value="metrics?.lifetimePoints.total ?? null"
         />
+
+        <MetricCard
+          hint="table believes you"
+          label="TRUST"
+          :precision="3"
+          side="neutral"
+          :value="metrics?.general.Trust_L ?? null"
+        />
       </section>
 
       <!-- Index history -->
@@ -104,23 +112,6 @@
         </v-card>
       </section>
 
-      <!-- General (side-agnostic) metrics + play-style radar -->
-      <section v-if="metrics" class="r-general">
-        <v-card class="r-general-card pa-5">
-          <h2 class="r-split-title">GENERAL</h2>
-
-          <div class="r-general-grid">
-            <div class="r-general-metrics">
-              <MetricCard hint="led nominations approved" label="LEADER APPROVAL" :precision="3" :value="metrics.general.LeaderApproval_L" />
-              <MetricCard hint="suspicion records omitting you" label="TRUST" :precision="3" :value="metrics.general.Trust_L" />
-            </div>
-
-            <div class="r-general-radar">
-              <StatsRadarChart :stats="radarStats" />
-            </div>
-          </div>
-        </v-card>
-      </section>
 
       <!-- Game log -->
       <section class="r-game-log">
@@ -197,7 +188,6 @@
   import MissionTracker from '@/components/MissionTracker.vue'
   import PlayerRoleTag from '@/components/PlayerRoleTag.vue'
   import SideTable from '@/components/SideTable.vue'
-  import StatsRadarChart from '@/components/StatsRadarChart.vue'
   import {
     fetchUserGames,
     fetchUserIndex,
@@ -228,37 +218,6 @@
   const error = ref('')
 
   const usernameDisplay = computed(() => usernameRaw.value || 'Unknown player')
-
-  /**
-   * Play-style radar, all axes scaled to 0-100:
-   *  - Detection   = RoS_L, from [-1, 1]
-   *  - Deception   = RoI_L, clamped to [0, 1]
-   *  - Leadership  = LeaderApproval_L
-   *  - Trust       = Trust_L
-   *  - Consistency = inverse of per-game point volatility (index history)
-   * Missing metrics render as a neutral 50 rather than collapsing the axis.
-   */
-  const radarStats = computed(() => {
-    const m = metrics.value
-    const pct = (v: number | null | undefined, lo: number, hi: number) =>
-      v === null || v === undefined ? 50 : Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100))
-
-    let consistency = 50
-    const pts = (indexBundle.value?.history ?? []).map(h => h.points)
-    if (pts.length >= 2) {
-      const mean = pts.reduce((a, b) => a + b, 0) / pts.length
-      const stdev = Math.sqrt(pts.reduce((a, b) => a + (b - mean) ** 2, 0) / pts.length)
-      consistency = Math.max(0, Math.min(100, 100 - stdev * 5))
-    }
-
-    return {
-      Leadership: pct(m?.general.LeaderApproval_L, 0, 1),
-      Deception: pct(m?.spy.RoI_L, 0, 1),
-      Detection: pct(m?.resistance.RoS_L, -1, 1),
-      Consistency: consistency,
-      Trust: pct(m?.general.Trust_L, 0, 1),
-    }
-  })
   const lifetimeHint = computed(() => {
     if (!metrics.value) return ''
     return `R ${metrics.value.lifetimePoints.resistance} · S ${metrics.value.lifetimePoints.spy}`
@@ -387,11 +346,12 @@
 
 .r-grid-headline {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* auto-fit so the 5 cards flow without an orphan row and stay responsive
+     down to tablet; collapse to a single column on phones. */
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
   margin-bottom: 24px;
 }
-@media (max-width: 960px) { .r-grid-headline { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 600px) { .r-grid-headline { grid-template-columns: 1fr; } }
 
 .r-index-history { margin-bottom: 24px; }
@@ -399,25 +359,6 @@
   background-color: rgb(var(--v-theme-surface)) !important;
   border: 1px solid rgb(var(--v-theme-border)) !important;
 }
-
-.r-general { margin-bottom: 24px; }
-.r-general-card {
-  background-color: rgb(var(--v-theme-surface)) !important;
-  border: 1px solid rgb(var(--v-theme-border)) !important;
-}
-.r-general-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  align-items: center;
-  margin-top: 12px;
-}
-.r-general-metrics {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-@media (max-width: 960px) { .r-general-grid { grid-template-columns: 1fr; } }
 
 .r-grid-split {
   display: grid;
